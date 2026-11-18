@@ -3,3 +3,7 @@ PyTorch: 2.15.0+cu134
 CUDA: 13.4
 GPU: NVIDIA GeForce RTX 3060 Ti
 GPU memory (GB): 8.0
+Operating system: Microsoft Windows 11 Home, version 10.0.26300 (build 26300), 64-bit
+NVIDIA driver: 617.42
+pip: 26.3 (project virtual environment .venv)
+Recorded: 2026-11-18

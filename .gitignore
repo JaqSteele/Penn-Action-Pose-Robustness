@@ -1,17 +1,81 @@
-﻿.venv/
+# =====================================================================
+# Python environment and caches
+# =====================================================================
+.venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
 .pytest_cache/
 .mypy_cache/
 
-data/raw/
-data/processed/
-data/poses/
+# =====================================================================
+# Dataset and derived data (Penn Action must NOT be redistributed)
+# ---------------------------------------------------------------------
+# "folder/*" ignores everything inside a folder; the "!" lines then
+# re-allow only the empty .gitkeep placeholder so the folder exists in Git.
+# =====================================================================
+data/*
+!data/raw/
+!data/processed/
+!data/poses/
+data/raw/*
+data/processed/*
+data/poses/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/poses/.gitkeep
 
-checkpoints/
-logs/
+# Safety net: dataset-style files anywhere in the project
+Penn_Action/
+*.mat
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.mp4
+*.avi
+*.mov
 
+# Array / tabular data dumps (large derived pose data)
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.parquet
+
+# =====================================================================
+# Model checkpoints and weights
+# =====================================================================
+checkpoints/*
+!checkpoints/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# =====================================================================
+# Logs and experiment-tracking output
+# =====================================================================
+logs/*
+!logs/.gitkeep
+*.log
+runs/
+wandb/
+mlruns/
+lightning_logs/
+outputs/
+
+# =====================================================================
+# Secrets and operating-system clutter
+# =====================================================================
 .env
+.env.*
 .DS_Store
 Thumbs.db
+desktop.ini

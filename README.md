@@ -1,4 +1,4 @@
-﻿# Penn Action: Pose Estimation Robustness in Human Action Recognition
+# Penn Action: Pose Estimation Robustness in Human Action Recognition
 
 ## Research question
 
@@ -38,17 +38,15 @@ The Python environment, GPU-enabled PyTorch installation, project directory stru
 
 ## Reproducibility
 
-The Python dependencies are recorded in equirements.txt. Environment and hardware information are recorded in environment-info.txt.
+The Python dependencies are recorded in `requirements.txt`. Environment and hardware information are recorded in `environment-info.txt`.
 
 ## Repository structure
 
-- configs/ - Experiment configuration files.
-- data/ - Dataset storage and processed data.
-- experiments/ - Experiment scripts and records.
-- 
-otebooks/ - Exploratory analysis.
-- src/ - Project source code.
-- esults/ - Generated figures and tables.
-- checkpoints/ - Model checkpoints.
-- logs/ - Training and experiment logs.
-
+- `configs/` - Experiment configuration files.
+- `data/` - Dataset storage and processed data.
+- `experiments/` - Experiment scripts and records.
+- `notebooks/` - Exploratory analysis.
+- `src/` - Project source code.
+- `results/` - Generated figures and tables.
+- `checkpoints/` - Model checkpoints.
+- `logs/` - Training and experiment logs.
