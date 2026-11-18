@@ -1,0 +1,5 @@
+Python: 3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]
+PyTorch: 2.15.0+cu134
+CUDA: 13.4
+GPU: NVIDIA GeForce RTX 3060 Ti
+GPU memory (GB): 8.0
