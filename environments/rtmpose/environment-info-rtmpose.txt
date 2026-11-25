@@ -1,0 +1,49 @@
+RTMPose estimator environment - verified information
+Recorded: 2026-11-25 (values below were read from the running environment)
+Environment path (outside this repository): C:\venvs\penn-action-rtmpose
+
+Operating system: Microsoft Windows 11 Home, version 10.0.26300 (build 26300), 64-bit
+Python: 3.11.9 (venv created from C:\Users\JaqSt\AppData\Local\Programs\Python\Python311)
+pip: 24.0
+setuptools: 65.5.0
+
+PyTorch: 2.1.2+cu121
+torchvision: 0.16.2+cu121
+CUDA runtime (bundled with PyTorch): 12.1
+cuDNN: 8.8.1 (torch.backends.cudnn.version() = 8801)
+CUDA available: True
+
+GPU: NVIDIA GeForce RTX 3060 Ti
+GPU memory: 8192 MiB
+Compute capability: 8.6 (Ampere)
+NVIDIA driver: 617.42 (driver CUDA user-mode version 13.4)
+
+OpenMMLab packages:
+  mmcv: 2.1.0 (prebuilt Windows wheel; compiled ops import successfully)
+  mmengine: 0.10.7
+  mmdet: 3.2.0
+  mmpose: 1.3.2 (installed from PyPI, non-editable, with --no-deps)
+
+Key numerical / image packages:
+  numpy: 1.26.4
+  opencv-python: 4.11.0.86
+  scipy: 1.17.1
+  matplotlib: 3.11.2
+  pillow: 13.0.0
+  xtcocotools: 1.14.3
+  pycocotools: 2.0.7
+  shapely: 2.2.0
+  munkres: 3.0.0
+  json-tricks: 3.17.3
+
+Intentionally not installed: chumpy (not required for RTMPose inference: MMPose imported,
+loaded the model and ran RTMPose inference in this environment without it).
+"pip check" reports exactly one expected issue: "mmpose 1.3.2 requires chumpy, which is not installed."
+
+Default PyTorch numerical settings observed (not changed by MMPose or MMEngine):
+  cudnn.enabled=True, cudnn.benchmark=False, cudnn.deterministic=False,
+  cudnn.allow_tf32=True, cuda.matmul.allow_tf32=False,
+  float32_matmul_precision=highest, deterministic_algorithms=False,
+  CUBLAS_WORKSPACE_CONFIG unset
+
+Full package list: requirements-rtmpose.lock.txt (output of "pip freeze --all").

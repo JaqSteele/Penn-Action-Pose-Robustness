@@ -36,14 +36,25 @@ The dataset is intended for research use. Dataset files and derived annotations 
 
 The Python environment, GPU-enabled PyTorch installation, project directory structure, and Git repository have been established. Data preparation, pose estimation, and experiments have not yet been completed.
 
+| Component | Status |
+|---|---|
+| Research protocol | Draft v0.3 ([`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md)) |
+| Pose estimator (RTMPose-M) | Separate environment installed and smoke-tested. These tests verify software functionality only, **not** accuracy on Penn Action. See [`docs/POSE_ESTIMATION_SETUP.md`](docs/POSE_ESTIMATION_SETUP.md). |
+| Estimator settings | Recorded in [`configs/pose/rtmpose_m.yaml`](configs/pose/rtmpose_m.yaml); not yet formally frozen |
+| 17-to-12 joint mapping, pose extraction, experiments | Not started |
+
 ## Reproducibility
 
-The Python dependencies are recorded in `requirements.txt`. Environment and hardware information are recorded in `environment-info.txt`.
+The main research environment's Python dependencies are recorded in `requirements.txt`, and its environment and hardware information in `environment-info.txt`.
+
+The RTMPose pose estimator runs in a separate, pinned environment, because the official MMPose software is incompatible with the main environment's PyTorch and NumPy versions. Its lock file and setup notes are in [`environments/rtmpose/`](environments/rtmpose/README.md).
 
 ## Repository structure
 
-- `configs/` - Experiment configuration files.
+- `configs/` - Experiment and estimator configuration files.
 - `data/` - Dataset storage and processed data.
+- `docs/` - Research protocol and setup documentation.
+- `environments/` - Records of separate software environments (e.g. RTMPose).
 - `experiments/` - Experiment scripts and records.
 - `notebooks/` - Exploratory analysis.
 - `src/` - Project source code.

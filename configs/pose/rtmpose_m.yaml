@@ -1,0 +1,95 @@
+# Project-level estimator configuration: RTMPose-M
+# Recorded: 2026-11-25. Documentation: docs/POSE_ESTIMATION_SETUP.md
+#
+# Status labels used below:
+#   verified_source    - read from the official config / installed MMPose 1.3.2 source
+#   verified_execution - confirmed by running code in the RTMPose environment
+#   proposed           - recommended, NOT yet formally frozen (protocol D-03 / D-04 / D-05 open)
+#
+# This file is not yet read by any code. It records settings; it does not change them.
+
+config_status: draft_not_frozen
+
+environment:
+  python_executable: 'C:\venvs\penn-action-rtmpose\Scripts\python.exe'   # outside the repository
+  lock_file: environments/rtmpose/requirements-rtmpose.lock.txt
+  info_file: environments/rtmpose/environment-info-rtmpose.txt
+
+model:
+  name: RTMPose-M
+  mmpose_version: '1.3.2'
+  mmpose_config: configs/body_2d_keypoint/rtmpose/coco/rtmpose-m_8xb256-420e_coco-256x192.py
+  mmpose_config_sha256: f27da50a81c3d3b5c426262118b9a030d15c9dbddccda7100b8cc0bcd07f6fff
+  mmpose_base_config_sha256: bb7df18270b1ca337192faae7a416b2dea23b45e798e832caab5781f41189d06   # _base_/default_runtime.py
+  num_keypoints: 17
+  keypoint_format: coco17
+  load_status: verified_execution   # the model loads and runs; NOT a formal research decision (D-03 open)
+
+checkpoint:
+  filename: rtmpose-m_simcc-coco_pt-aic-coco_420e-256x192-d8dd5ca4_20230127.pth
+  url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-coco_pt-aic-coco_420e-256x192-d8dd5ca4_20230127.pth
+  size_bytes: 54535816
+  md5: b498ff40dc64220592b3ec9736cfa26e
+  sha256: 929f00f2d84764aa0297decf13a84556642e43cbf5fca8cfb16e7326d92dfd97   # reference identifier
+  filename_tag_matches_sha256_prefix: false   # 'd8dd5ca4' is not a SHA-256 prefix of this file
+  local_path: 'C:\venvs\penn-action-rtmpose-setup\checkpoints\rtmpose-m_simcc-coco_pt-aic-coco_420e-256x192-d8dd5ca4_20230127.pth'
+  redistributed: false
+  licence: unresolved   # protocol D-30; see docs/POSE_ESTIMATION_SETUP.md section 7
+  load_status: verified_execution   # file loads and matches the hashes above; NOT a formal research decision
+
+inference:
+  # Values the official pipeline uses today (verified), regardless of whether they are frozen.
+  input_size_wh: [192, 256]                # verified_source
+  bbox_format: xyxy                         # verified_source + verified_execution
+  bbox_padding: 1.25                        # verified_source (GetBBoxCenterScale default) + verified_execution
+  aspect_ratio_fix: enlarge_to_3_4          # verified_source (TopdownAffine)
+  interpolation: bilinear                   # verified_source (cv2.INTER_LINEAR)
+  out_of_image_fill: opencv_default_constant_black   # verified_source (no border args passed)
+  input_colour_order: BGR                   # verified_source + verified_execution (pass file paths or BGR arrays)
+  internal_colour_conversion: bgr_to_rgb    # verified_source
+  normalise_mean_rgb: [123.675, 116.28, 103.53]   # verified_source
+  normalise_std_rgb: [58.395, 57.12, 57.375]      # verified_source
+  flip_test: true                           # verified_source + verified_execution
+  simcc_split_ratio: 2.0                    # verified_source
+  use_dark: false                           # verified_source
+  score_definition: min_of_axis_maxima_raw_not_probability   # verified_source (max observed 1.022)
+  invalid_keypoint_rule: score_le_0_sets_location_minus1_before_rescale   # verified_source
+  random_operations: none                   # verified_source + verified_execution (bit-identical repeats)
+  backbone_pretrained_init_disabled: true   # verified_source + verified_execution
+  init_model_cfg_options: null              # must stay null, or backbone init_cfg is not cleared
+  keypoint_id2name:                         # verified_execution (from checkpoint dataset_meta)
+    [nose, left_eye, right_eye, left_ear, right_ear, left_shoulder, right_shoulder,
+     left_elbow, right_elbow, left_wrist, right_wrist, left_hip, right_hip,
+     left_knee, right_knee, left_ankle, right_ankle]
+  flip_indices: [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]   # verified_execution
+
+runtime_defaults_observed:   # verified_execution; PyTorch defaults, not set by MMPose
+  cudnn_benchmark: false
+  cudnn_deterministic: false
+  cudnn_allow_tf32: true
+  matmul_allow_tf32: false
+  device_tested: [cuda:0, cpu]   # identical keypoints on the test image
+
+proposed_freeze:
+  # Recommendations awaiting formal approval. None of these are frozen.
+  status: proposed
+  flip_test: true                  # matches how the checkpoint's published accuracy was measured
+  bbox_padding: 1.25               # matches the official train/test pipeline; not to be tuned on Penn Action
+  bbox_format: xyxy                # convert Penn Action boxes explicitly in project code; pass bbox_format explicitly
+  image_input: file_path           # avoids silent RGB/BGR errors
+  device: cuda:0
+  precision: fp32                  # no mixed precision
+  cudnn_benchmark: false
+  cudnn_deterministic: true
+  cudnn_allow_tf32: false          # strict FP32; removes hardware-dependent rounding at SimCC bin boundaries
+  cpu_crosscheck_sample: true      # compare a sample of frames on CPU
+  store_all_17_keypoints: true     # map to 12 joints later, in the main environment
+  invalid_keypoints: keep_raw_and_flag_score_le_0   # final treatment depends on protocol D-07
+  open_items:
+    - Penn Action box format and semantics (verify after download; D-05, D-01)
+    - boxes partly outside the frame, degenerate boxes, frames without a box (D-05)
+    - batched vs per-frame inference equivalence (not yet tested)
+
+research_mapping:
+  primary_joints: 12             # shoulders, elbows, wrists, hips, knees, ankles (RESEARCH_PROTOCOL.md section 6)
+  status: not_implemented        # separate component; left/right (D-09) and ordering (D-11) not yet verified
