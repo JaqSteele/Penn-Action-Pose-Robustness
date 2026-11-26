@@ -2,7 +2,10 @@
 
 This document explains how the code implements the research protocol (`docs/RESEARCH_PROTOCOL.md`, v0.11). The protocol is authoritative: if the two ever disagree, the protocol wins and the code must be fixed.
 
-**Status (Batch B):** foundations only. No pose inference, no recognition models and no experiments are implemented yet.
+**Status:**
+- **Batch B:** foundations.
+- **Batch C:** frame extraction and checks, plus the RTMPose pipeline and its five-video smoke test (see `docs/INFERENCE.md`).
+- **Not yet done:** full training-partition inference, recognition models and experiments.
 
 ## Layout
 
@@ -15,6 +18,11 @@ This document explains how the code implements the research protocol (`docs/RESE
 | `src/penn_pose/gt_preprocess.py` | Corner-placeholder repair (D-07b), and the ground-truth pipeline |
 | `src/penn_pose/normalise.py` | Per-video normalisation and its inverse (D-12) |
 | `src/penn_pose/integrity.py` | Annotation-file integrity checks against the SHA-256 manifest |
+| `src/penn_pose/frames.py` | Frame naming, listing and D-01 frame checks (Batch C) |
+| `src/penn_pose/pose_io.py` | D-34a validity flags; per-video estimator output format (Batch C) |
+| `src/penn_pose/inference_config.py` | RTMPose settings, hashes and the smoke-test selection (Batch C) |
+| `src/penn_pose/e1.py` | Measurement E1 diagnostics for invalid estimates (Batch C) |
+| `scripts/` | Extraction, verification, inference, smoke checks and overlays (see `docs/INFERENCE.md`) |
 | `configs/splits/fitting.txt`, `validation.txt` | The stored split lists (identifiers only) |
 | `tests/` | Standard-library `unittest` tests |
 
