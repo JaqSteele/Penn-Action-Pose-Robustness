@@ -4,7 +4,7 @@
 **Recorded:** 2026-11-25
 **Related:** [`environments/rtmpose/`](../environments/rtmpose/README.md) (environment), [`configs/pose/rtmpose_m.yaml`](../configs/pose/rtmpose_m.yaml) (settings), [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md) (methodology)
 
-> **Scope of this document.** It records *which* estimator is installed, *how* it is configured, and *that* the software works. The smoke tests described here verify software functionality only. They do **not** measure pose-estimation accuracy on Penn Action, and they must not be cited as evidence of research accuracy. The estimator choice and settings are not yet formally frozen in the research protocol (decisions D-03, D-04 and D-05 remain open there).
+> **Scope of this document.** It records *which* estimator is installed, *how* it is configured, and *that* the software works. The smoke tests described here verify software functionality only. They do **not** measure pose-estimation accuracy on Penn Action, and they must not be cited as evidence of research accuracy. The estimator choice and settings are not yet formally frozen in the research protocol (decisions D-03 and D-04 remain open there). Bounding-box validity, fallback and crop settings are resolved under D-05 (protocol v0.8, amended in v0.9). Handling of keypoints with score ≤ 0 is open under D-34; the native rule and principles are recorded in protocol Section 5.5.4.
 
 ## How to read the evidence labels
 
