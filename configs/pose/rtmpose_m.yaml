@@ -86,8 +86,8 @@ proposed_freeze:
   store_all_17_keypoints: true     # map to 12 joints later, in the main environment
   invalid_keypoints: keep_raw_and_flag_score_le_0   # final treatment open under protocol D-34 (linked to D-07b)
   open_items:
-    - Penn Action box format and semantics (verify after download; D-05, D-01)
-    - boxes partly outside the frame, degenerate boxes, frames without a box (D-05)
+    - Penn Action box format and semantics (verify after download; D-05, D-01)   # D-05 resolved: protocol v0.8 sections 5.2.1-5.2.3 (xyxy; provenance inferred); D-01 still open
+    - boxes partly outside the frame, degenerate boxes, frames without a box (D-05)   # D-05 resolved: protocol v0.8 section 5.2.2 (validity, nearest-valid-box and full-image fallback)
     - batched vs per-frame inference equivalence (not yet tested)
 
 research_mapping:
