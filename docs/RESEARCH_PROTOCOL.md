@@ -1,7 +1,7 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.12 for review. Not final.
+**Document status:** Draft v0.13 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. RTMPose has been run **only in software smoke tests on non-Penn Action images** (an official MMPose test photograph and a synthetic black image), including a single-image CPU-versus-GPU comparison (`docs/POSE_ESTIMATION_SETUP.md`, Sections 4.2 and 5). **No pose has been estimated on any Penn Action frame.** The CPU cross-check listed under `D-04` (Section 5.1) is a planned step of future Penn Action inference, not a completed one. No recognition model has been trained and no experiment has been run. This document contains **no experimental results**.
 
@@ -21,6 +21,7 @@
 | v0.10 | 2026-11-26 | **D-06b resolved:** primary PCK threshold α = 0.05 × `s_v`, supplementary α = 0.10 × `s_v`, PCK curve over α = 0–0.20 in steps of 0.01, and its normalised area under the curve (trapezoidal rule); study-defined choices justified by a training-partition scale analysis, not universal conventions. **D-15 split:** D-15a resolved (non-parametric resampling of measured, contiguous whole-pose residual sequences; G0 gap handling; no wrap-around; no source–target overlap; deterministic sampling and concatenation rules; logging); D-15b (numerical seeding scheme) open, to be decided with D-14. **D-34 split:** D-34a resolved (validity checks, preservation of raw output, exclusion from residuals, metric rules, same-joint temporal imputation); D-34b open (imputation steps 2–4, provisional pending measurement E1). The comparable-time-step assumption and the G0 under-corruption limitation are recorded. No experiment has been run. New Sections 5.4.1 and 8.2.3; Sections 5.4, 5.5, 5.5.4, 7.4, 8.2, 8.2.1, 8.2.2, 8.4, 9.3, 9.4.3, 9.4.4, 12 and 14 updated. No other methodological decisions changed. |
 | v0.11 | 2026-11-26 | **Release 1.0 scope amendment, made before any pose inference, model training or result** (`D-35`). Release 1.0 runs C1, C2 and C3 with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest and the S1 sensitivity analysis are **deferred, not removed**: their methodology is retained for a later release. The research question, the C1–C5 definitions and all previously resolved decisions are unchanged. **Resolved:** D-03 (RTMPose-M rationale), D-04 (inference implementation and runtime settings), D-20 (resampling to 64 frames), D-21 (temporal CNN architecture), D-22 (tuning grid and epoch selection on C1 validation), D-24 (class-weighted loss), D-25 (three seeds), D-26 (10,000 bootstrap resamples), D-27 (percentile intervals; pre-specified seed-averaged procedure, with seed variation reported separately) and D-28 (two planned comparisons, H1 and H2). **Deferred:** D-08 (exploratory part), D-14, D-15b, D-16, D-17 and D-19 (new Section 14.3). **Still open:** D-01, D-29, D-30, D-31, D-32 and D-34b. New label [DEFERRED]; new Sections 1.4, 9.5 and 10.7; Sections 2.2, 4.4, 5.1, 7, 8, 9.1, 9.3, 10.2–10.6, 11.1, 12 and 14 updated. |
 | v0.12 | 2026-11-26 | Clarification only: the canonical order of the 12-joint primary representation is COCO keypoints 5–16 (Section 6.2); the Penn Action table remains the source mapping. Section 9.5.1 cross-reference updated. No methodological decision changed. |
+| v0.13 | 2026-11-26 | **D-34b resolved**, using measurement E1 on the **fitting subset only** (training-partition RTMPose inference at commit `5de1fa8`). Of 885,516 primary keypoint observations in the fitting subset, 20 were invalid under D-34a, in 7 videos. Every one lies in a track with valid estimates elsewhere in the same video, so all 20 were handled by D-34a step 1, and no video required steps 2–4. Steps 2–4 are **retained unchanged as pre-specified safety fallbacks**, and the complete four-step rule is frozen before any test-partition inference. Test-partition E1 results will be descriptive only and cannot change preprocessing (Section 4.3). Sections 5.5, 5.5.4, 9.3, 9.4.3, 9.4.4 and 14 updated. No other methodological decision changed. |
 
 ---
 
@@ -353,7 +354,7 @@ Head-joint error is outside the primary analysis and may be reported only in the
 Penn Action provides a per-joint visibility flag. Its handling was investigated on the downloaded annotations and is split into two decisions:
 - `D-07a` covers the semantics, error measurement, corruption fitting, the use of visibility as an input, and test-set use. **[ESTABLISHED, v0.6]**
 - `D-07b` covers how invisible ground-truth coordinates enter recogniser inputs. **[ESTABLISHED, v0.9]**
-- `D-34`, a related but separate decision, covers RTMPose invalid keypoints (Section 5.5.4). **[`D-34a` ESTABLISHED, v0.10; `D-34b` OPEN]**
+- `D-34`, a related but separate decision, covers RTMPose invalid keypoints (Section 5.5.4). **[`D-34a` ESTABLISHED, v0.10; `D-34b` ESTABLISHED, v0.13]**
 
 **[ESTABLISHED]** All rules are applied **consistently across all conditions**, and are recorded before any test-set evaluation.
 
@@ -444,7 +445,7 @@ Both partner copying and the `c_v` fallback remain approximations, not recovered
 
 **Interaction with other decisions.** D-07b is applied at the original frame rate, before temporal preprocessing (`D-20`, resolved in v0.11) and before normalisation (Section 9.4.3). It does not depend on how D-20 was resolved. Because the D-12 normalisation is computed from boxes rather than joints, D-07b changes only the coordinate values being normalised.
 
-#### 5.5.4 RTMPose invalid keypoints (`D-34a` resolved in v0.10; `D-34b` open)
+#### 5.5.4 RTMPose invalid keypoints (`D-34a` resolved in v0.10; `D-34b` resolved in v0.13)
 
 Related to D-07b, but a separate decision.
 
@@ -468,12 +469,16 @@ Related to D-07b, but a separate decision.
 7. **Imputation step 1 (resolved).** For recogniser inputs, an invalid keypoint in the 12-joint representation is replaced, at the original frame rate and before normalisation, by linear interpolation in time between the same keypoint's nearest valid estimates. At the start or end of the video, the nearest valid estimate is held.
 8. **No exclusion.** No frame or video is dropped because of invalid keypoints, because paired evaluation requires identical test sets and sequence lengths in every condition.
 
-**D-34b: imputation steps 2–4 [OPEN; provisional pending measurement E1]:**
+**D-34b: imputation steps 2–4 (resolved in v0.13) [ESTABLISHED]:**
 - **Step 2:** if a keypoint is never valid anywhere in the video, copy its left/right partner's estimated track, but only if that track contains usable estimates after step 1 has been applied to it (that is, the partner has at least one valid estimate in the video). If the partner track is also entirely invalid, go to step 3.
 - **Step 3:** otherwise, use the per-video mean position of the valid estimated primary keypoints. The mean is calculated from the **original valid estimates, before any imputation**: the x and y coordinates are each averaged over all valid joint-frame observations of the primary keypoints in that video. Values imputed by step 1 or step 2 are not included.
 - **Step 4:** if no primary keypoint is valid anywhere in the video, use the image centre (W/2, H/2). Such a video is flagged, retained and reported.
 
-These steps use no ground-truth coordinates, visibility or box centres. They remain **provisional** until **measurement E1** has been made on the fitting subset after Penn Action inference. E1 counts: the invalid rate per primary joint and per video; the longest run of invalid frames; the number of keypoint tracks never valid in their video; the number of frames with no valid primary keypoint; and the number of videos that would need steps 2–4. If E1 finds that steps 2–4 would never be needed, they may be simplified. How often invalid keypoints occur on Penn Action is currently **unknown**; none occurred in the smoke tests.
+These steps use no ground-truth coordinates, visibility or box centres.
+
+**Measurement E1 (fitting subset only; RTMPose inference at commit `5de1fa8`).** E1 counts the invalid rate per primary joint and per video, the longest run of invalid frames, the number of keypoint tracks never valid in their video, the number of frames with no valid primary keypoint, and the number of videos that would need steps 2–4. Of 885,516 primary keypoint observations (73,793 frames × 12 joints in 1,070 videos), **20 were invalid** under D-34a (0.0023%), in 7 videos. Every invalid observation lies in a track that has valid estimates elsewhere in the same video, so **all 20 are handled by D-34a step 1**. E1 found no track that is never valid, no frame without a valid primary joint, and therefore **no video requiring step 2, 3 or 4**. The longest run of invalid frames is 6. The validation subset contains no invalid keypoints; it was not used for this decision.
+
+**Status of steps 2–4.** Although E1 found no use for them, steps 2–4 are **retained unchanged as pre-specified safety fallbacks**. The complete four-step rule (D-34a step 1 and D-34b steps 2–4) is **frozen now, before any test-partition inference**, and is applied unchanged to every estimated pose, including test videos. Test-partition E1 results, including the number of keypoints needing each step, will be **descriptive only**: they will be reported, and they **cannot change preprocessing**, because the test partition must not inform preprocessing choices (Section 4.3).
 
 ---
 
@@ -803,7 +808,7 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 - *(Temporal CNN architecture, tuning procedure and temporal preprocessing are now resolved: `D-21`, `D-22`, `D-20`, Section 9.5.)*
 - *(Pose normalisation is now resolved: `D-12`, Section 9.4.)*
 - *(Representation of invisible ground-truth joints in model input is now resolved: `D-07b`, Section 5.5.3.)* Visibility flags are never inputs, and ground-truth visibility is never applied to estimated poses (`D-07a`).
-- Representation of invalid RTMPose keypoints in model input: validity checks and same-joint temporal imputation resolved (`D-34a`); fallback steps 2–4 provisional pending measurement E1 (`D-34b`, Section 5.5.4).
+- *(Representation of invalid RTMPose keypoints in model input is now resolved: `D-34a` in v0.10 and `D-34b` in v0.13, Section 5.5.4.)*
 - Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`, deferred with those models).
 - *(Class-imbalance handling is now resolved: `D-24`, Section 9.5.)*
 
@@ -840,7 +845,7 @@ Ground-truth bounding boxes are **supplied oracle information** in this study's 
 The proposed order of preprocessing steps is listed below. Where a step depends on an open decision, its content, and if necessary its position, will be confirmed when that decision is made.
 
 1. **Joint mapping** to the 12-joint primary representation (`D-09`, `D-11`).
-2. **Unreliable coordinates:** corner placeholders in ground-truth poses (`D-07b`, resolved in v0.9; ground-truth poses only; Section 5.5.3) and RTMPose invalid keypoints (`D-34a` resolved, `D-34b` open; estimated poses only; Section 5.5.4). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions.
+2. **Unreliable coordinates:** corner placeholders in ground-truth poses (`D-07b`, resolved in v0.9; ground-truth poses only; Section 5.5.3) and RTMPose invalid keypoints (`D-34a` and `D-34b` resolved; estimated poses only; Section 5.5.4). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions.
 3. **Corruption** (C4 and C5 only, so not used in Release 1.0; `D-15a` and `D-18` resolved, Sections 8.2.2–8.2.3; `D-14`, `D-15b`, `D-16` and `D-17` deferred).
 4. **Per-video normalisation** (`D-12`, this section).
 5. **Temporal preprocessing** (`D-20`, resolved in v0.11: resampling to 64 frames; Section 9.5.1). Corruption is placed before this step because the residual sequences resampled under `D-15a` (Section 8.2.3) are defined at the original frame rate.
@@ -854,7 +859,7 @@ The proposed order of preprocessing steps is listed below. Where a step depends 
 - **Computed from the pose actually supplied to the model:** ground truth in C1, estimated poses in C2, C3 and C5 testing, and corrupted ground truth in C4. A reference derived from ground truth is **never** applied to estimated poses, consistent with `D-07a` rule 4.
 - **Timing:** run only **after the primary analysis is complete**, with all primary settings frozen (no retuning). It is reported as a secondary analysis and does not replace the primary result.
 - **Purpose:** to test whether conclusions depend on the coordinate representation. Under S1, estimator error in the hip joints also shifts the reference point, so differences between S1 and the primary result are themselves informative.
-- **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with `D-07b` (resolved in v0.9), `D-34a` (resolved in v0.10) and the eventual `D-34b` decision.
+- **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with `D-07b` (resolved in v0.9), `D-34a` (resolved in v0.10) and `D-34b` (resolved in v0.13).
 
 ### 9.5 Release 1.0 recogniser specification (resolved in v0.11) **[ESTABLISHED]**
 
@@ -1115,6 +1120,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-34b *(v0.13)* | RTMPose invalid keypoints: fallback imputation | Steps 2–4 **retained unchanged as pre-specified safety fallbacks**: step 2, when a keypoint is never valid in the video, copy the partner's estimated track only if it contains usable estimates after step 1 (at least one valid estimate); step 3, if the partner track is also entirely invalid, the per-video mean of the original valid estimated primary-keypoint observations (x and y averaged over valid joint-frame observations, before any imputation); step 4, if no primary keypoint is valid anywhere in the video, the image centre (video flagged, retained, reported). No ground-truth coordinates, visibility or box centres. **Evidence (E1, fitting subset only):** 20 of 885,516 primary keypoint observations invalid, in 7 videos; all handled by D-34a step 1; no video required steps 2–4. The complete four-step rule is frozen before any test-partition inference; test-partition E1 results are descriptive only and cannot change preprocessing (Sections 4.3, 5.5.4). |
 | D-35 *(v0.11)* | Release 1.0 scope | Release 1.0 runs **C1, C2 and C3**, with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest, H3–H5, S1, the head analysis and condition-specific tuning are **deferred, not removed**. Fixed before any pose inference, training or result. The research question, the C1–C5 definitions and all earlier resolved decisions are unchanged (Section 1.4). |
 | D-03 *(v0.11)* | RTMPose variant | **RTMPose-M**, 256 × 192; configuration and checkpoint SHA-256 values as recorded in Section 5.1 and `docs/POSE_ESTIMATION_SETUP.md`. Rationale: a mid-sized official checkpoint, chosen before any Penn Action inference, that runs on the project's 8 GB GPU and is a standard top-down estimator. Other sizes were not evaluated; not tuned on Penn Action. Licensing remains D-30. |
 | D-04 *(v0.11)* | Inference implementation | A separate, locked environment (`environments/rtmpose/`), not part of `requirements.txt`. One box per call (per-frame inference, no batching); flip test on; FP32; cuDNN benchmark off; deterministic on; TF32 off; file-path input; explicit `xyxy` boxes after D-05; all 17 keypoints and scores stored; a CPU cross-check on a sample. The YAML status fields are unchanged pending a separate, approved configuration change (Sections 5.1, 11.1). |
@@ -1153,7 +1159,6 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-30 | Estimator licensing | Record the RTMPose/MMPose code and weight licences. |
 | D-31 | Repository licence | Choose a licence for this repository's code. |
 | D-32 | Figures | Whether dataset frames may appear in published figures. |
-| D-34b | RTMPose invalid keypoints: fallback imputation | **Provisional, pending measurement E1:** step 2, when a keypoint is never valid in the video, copy the partner's estimated track only if it contains usable estimates after step 1 (at least one valid estimate); step 3, if the partner track is also entirely invalid, the per-video mean of the original valid estimated primary-keypoint observations (x and y averaged over valid joint-frame observations, before any imputation); step 4, if no primary keypoint is valid anywhere in the video, the image centre (video flagged, retained, reported). No ground-truth coordinates, visibility or box centres. E1, on the fitting subset after inference: invalid rate per joint and video; longest invalid run; never-valid tracks; frames with no valid primary keypoint; videos needing steps 2–4. Steps may be simplified if E1 shows they are never needed (Section 5.5.4). |
 
 ### 14.3 Deferred to a later release **[DEFERRED]** (v0.11)
 
