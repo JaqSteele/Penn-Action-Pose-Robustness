@@ -1,9 +1,9 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.10 for review. Not final.
+**Document status:** Draft v0.11 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
-**Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
+**Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. RTMPose has been run **only in software smoke tests on non-Penn Action images** (an official MMPose test photograph and a synthetic black image), including a single-image CPU-versus-GPU comparison (`docs/POSE_ESTIMATION_SETUP.md`, Sections 4.2 and 5). **No pose has been estimated on any Penn Action frame.** The CPU cross-check listed under `D-04` (Section 5.1) is a planned step of future Penn Action inference, not a completed one. No recognition model has been trained and no experiment has been run. This document contains **no experimental results**.
 
 ### Revision history
 
@@ -19,22 +19,24 @@
 | v0.8 | 2026-11-26 | Resolved D-05 (ground-truth bounding boxes: validity, fallback and cropping). A box is valid if its row exists, its four values are finite and x2 > x1 and y2 > y1. Rows are aligned to frames from the first frame. D-12 medians use valid boxes only. Frames with an invalid box use the nearest valid box in the same video (ties: earlier frame); videos with no valid box use the full image. All frames and videos are retained. Invalid boxes are replaced before inference. Crop settings are those verified in the project's installed MMPose 1.3.2 inference pipeline (padding 1.25, then enlargement to the 3:4 input aspect ratio). Box provenance recorded as an evidence-supported inference, not a documented fact: the boxes appear to be the extent of the visible ground-truth joints, enlarged 1.2× and clipped to the image. Exact clipping boundaries uncertain. D-07a gains an explicit, documented D-05 exception to rule 4; its prohibition on direct use of ground-truth visibility flags or joint coordinates for estimated poses is unchanged. D-12 wording updated to acknowledge that its boxes carry inferred ground-truth pose information. New Sections 5.2.1–5.2.3; Sections 5.2, 5.5.2, 9.4.1, 9.4.2, 12 and 14 updated. No other methodological decisions changed. |
 | v0.9 | 2026-11-26 | Combined update. **D-05 amended:** a valid box also needs a diagonal of at least 0.05 × the actual image diagonal; only training video 1516 (placeholder box) is affected and now uses the existing full-image fallback. **D-02 resolved:** class-stratified 15% split (1,070 fitting / 188 validation) with a fully specified, seeded procedure and recorded list hashes. **D-07a evidence corrected** (rules unchanged in substance): placeholders are top-left corner points (x < 1 and y < 1, including (0,0)); other invisible coordinates are generally anatomically plausible but often frozen; the earlier edge-clamping and distorted-limb-length conclusions mainly reflected corner placeholders. **D-07b resolved:** Option A with coordinate-only placeholder handling. **D-06 split:** D-06a resolved (signed 2D residuals in units of `s_v`); D-06b (PCK threshold α) open. **D-18 resolved:** corruption is not conditioned on target visibility; the residual bank stores only measured residuals with an availability mask; gap handling and sequence sampling moved to D-15 (open). **D-34 narrowed** but still open: native rule and principles recorded; final handling awaits Penn Action inference. D-01, D-03, D-04, D-06b, D-15 and D-34 remain open. New Sections 4.1.1, 5.5.4, 8.2.1 and 8.2.2; Sections 4.1, 5.2.2, 5.4, 5.5, 8.2, 8.4, 9.3, 9.4.3, 9.4.4, 12 and 14 updated. No other methodological decisions changed. |
 | v0.10 | 2026-11-26 | **D-06b resolved:** primary PCK threshold α = 0.05 × `s_v`, supplementary α = 0.10 × `s_v`, PCK curve over α = 0–0.20 in steps of 0.01, and its normalised area under the curve (trapezoidal rule); study-defined choices justified by a training-partition scale analysis, not universal conventions. **D-15 split:** D-15a resolved (non-parametric resampling of measured, contiguous whole-pose residual sequences; G0 gap handling; no wrap-around; no source–target overlap; deterministic sampling and concatenation rules; logging); D-15b (numerical seeding scheme) open, to be decided with D-14. **D-34 split:** D-34a resolved (validity checks, preservation of raw output, exclusion from residuals, metric rules, same-joint temporal imputation); D-34b open (imputation steps 2–4, provisional pending measurement E1). The comparable-time-step assumption and the G0 under-corruption limitation are recorded. No experiment has been run. New Sections 5.4.1 and 8.2.3; Sections 5.4, 5.5, 5.5.4, 7.4, 8.2, 8.2.1, 8.2.2, 8.4, 9.3, 9.4.3, 9.4.4, 12 and 14 updated. No other methodological decisions changed. |
+| v0.11 | 2026-11-26 | **Release 1.0 scope amendment, made before any pose inference, model training or result** (`D-35`). Release 1.0 runs C1, C2 and C3 with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest and the S1 sensitivity analysis are **deferred, not removed**: their methodology is retained for a later release. The research question, the C1–C5 definitions and all previously resolved decisions are unchanged. **Resolved:** D-03 (RTMPose-M rationale), D-04 (inference implementation and runtime settings), D-20 (resampling to 64 frames), D-21 (temporal CNN architecture), D-22 (tuning grid and epoch selection on C1 validation), D-24 (class-weighted loss), D-25 (three seeds), D-26 (10,000 bootstrap resamples), D-27 (percentile intervals; pre-specified seed-averaged procedure, with seed variation reported separately) and D-28 (two planned comparisons, H1 and H2). **Deferred:** D-08 (exploratory part), D-14, D-15b, D-16, D-17 and D-19 (new Section 14.3). **Still open:** D-01, D-29, D-30, D-31, D-32 and D-34b. New label [DEFERRED]; new Sections 1.4, 9.5 and 10.7; Sections 2.2, 4.4, 5.1, 7, 8, 9.1, 9.3, 10.2–10.6, 11.1, 12 and 14 updated. |
 
 ---
 
 ## How to read this document
 
-Every methodological statement is tagged with one of three labels:
+Every methodological statement is tagged with one of four labels:
 
 | Label | Meaning |
 |---|---|
 | **[ESTABLISHED]** | Agreed and fixed for this study. Changing it requires an explicit, recorded protocol amendment. |
 | **[PROPOSED]** | The current intended approach. It may still be revised before experiments begin. |
 | **[OPEN]** | Not yet decided. Each open item is listed with an identifier (e.g. `D-01`) in Section 14. |
+| **[DEFERRED]** | Retained, but outside the scope of Release 1.0 (Section 1.4). Deferred decisions are listed in Section 14.3. |
 
 Facts about the Penn Action dataset are taken from its official documentation and original paper. Where a detail must be verified against the downloaded files, this is stated explicitly.
 
-The **primary experiment** is the pre-specified controlled comparison of C1–C5 described in this protocol. Any analysis outside it is labelled **secondary** or **exploratory**.
+The **primary experiment** is the pre-specified controlled comparison of C1–C5 described in this protocol. Any analysis outside it is labelled **secondary** or **exploratory**. **Release 1.0** runs the C1–C3 part of the primary experiment (Section 1.4); C4 and C5 are deferred to a later release.
 
 ---
 
@@ -51,6 +53,25 @@ Skeleton-based human action recognition is commonly developed and evaluated on m
 ### 1.3 Scope **[ESTABLISHED]**
 
 This is a **controlled empirical study**. It does not propose a new pose-estimation or action-recognition architecture. Every model used is a standard, well-understood method, so that differences in performance can be attributed to the pose input rather than to architectural novelty.
+
+### 1.4 Release 1.0 scope (`D-35`, resolved in v0.11) **[ESTABLISHED]**
+
+This scope was fixed **before any pose inference, model training or result**. It is therefore a pre-specified reduction, not one informed by outcomes.
+
+**Included in Release 1.0:**
+- conditions **C1, C2 and C3** (Section 7);
+- one learned recognition model, a **small temporal CNN** (Section 9.5), and a **majority-class baseline**;
+- **three training seeds** (`D-25`);
+- **paired, class-stratified video-level bootstrap intervals**, with training-seed variation reported separately (Section 10.7);
+- pose-estimation error analysis (Section 5.4), per-class performance and confusion matrices, and the exploratory joint-error analysis (H6);
+- all data-integrity, split and test-isolation safeguards (Sections 4.1–4.3);
+- a reproducible repository and a concise technical report.
+
+**Deferred to a later release** **[DEFERRED]**: conditions **C4 and C5**; the residual bank and artificial corruption (Section 8); logistic regression and random forest (Section 9.1); hypotheses **H3, H4 and H5**; the normalisation sensitivity analysis S1 (Section 9.4.4); the exploratory head analysis (Section 6.3); and condition-specific tuning (Section 4.4). Their methodology, including the decisions already resolved for them (`D-06a`, `D-15a`, `D-18`), is **retained unchanged** so that they can be added without redesign. Deferred decisions are listed in Section 14.3.
+
+**Unchanged by this amendment:** the research question (Section 1.2), the definitions of C1–C5 (Section 7), the official split and the D-02 fitting/validation split, the test-isolation rules, and every previously resolved decision.
+
+**Rationale.** C1 versus C2 measures the effect of real pose-estimation error at test time, and C3 versus C2 measures whether matching the training poses to that error changes it. Together they answer the central research question for one recogniser. C4 and C5 deepen the answer (a controlled severity curve and augmentation) but require substantial additional implementation, so they follow once Release 1.0 is complete.
 
 ---
 
@@ -79,6 +100,8 @@ The following are **proposed hypotheses to be tested**. They are not established
 | H6 *(exploratory)* | Pose-estimation error is not uniform across joints, and per-class performance changes are associated with errors in particular joints. | Per-joint error and per-class analysis |
 
 The direction stated in each hypothesis is an expectation for testing. A null or reversed result is an equally valid outcome and will be reported as such.
+
+**Release 1.0 (Section 1.4).** Release 1.0 tests **H1 and H2** as its planned comparisons, using the temporal CNN, and reports **H6** as exploratory. **H3, H4 and H5 are deferred** [DEFERRED]: H3 and H4 need C4 and C5, and H5 needs more than one recogniser family. Objectives 4 and 5 (Section 2.1) are deferred for the same reason.
 
 **About H6.** H6 is **exploratory**. Any association found between errors in particular joints and per-class performance is correlational. It will **not** be described as evidence that errors in those joints *caused* the performance changes. Joint errors, action classes, viewpoints and occlusion are not independently manipulated in this design, so they may be confounded with one another.
 
@@ -165,6 +188,8 @@ The official test partition is used **only for final evaluation**. It is not use
 
 For the **primary** controlled comparison, model development proceeds in two stages.
 
+*Release 1.0 (Section 1.4):* the items below that concern C4 and C5 (the C4 part of item 6, and items 8 and 10) do not apply until those conditions are run. How Stage A and Stage B are carried out for the temporal CNN in Release 1.0 is specified in Section 9.5.
+
 **Stage A: model selection (fitting and validation subsets)**
 
 1. **Selection on C1 only.** For each model family, the hyperparameters are selected using **C1's ground-truth validation data**: models are fitted on ground-truth poses from the fitting subset and evaluated on ground-truth poses from the validation subset. Where applicable (the temporal CNN), the **training epoch count** is also selected on C1 validation.
@@ -178,7 +203,7 @@ For the **primary** controlled comparison, model development proceeds in two sta
 6. **Shared final model for C1, C2 and C4.** For each seed, a single final ground-truth-trained model is fitted on ground-truth poses from the full training partition. That **same final model** is evaluated on ground-truth test poses (C1), estimated test poses (C2) and corrupted ground-truth test poses (C4). Only the test-time pose input changes.
 7. **Final model for C3.** C3 trains the same architecture with the frozen settings on **estimated** poses from the full official training partition.
 8. **Final model for C5.** C5 trains the same architecture with the frozen settings on **ground-truth** poses from the full official training partition, with **synthetic corruption augmentation**.
-9. **Data-fitted preprocessing.** Any preprocessing step whose parameters are estimated from data (for example, feature standardisation statistics) is **refitted on the full official training partition** (all 1,258 videos) for the final models. It is **never** fitted using the test partition. Pose normalisation (`D-12`, resolved, Section 9.4) estimates no parameters across videos, so it needs no refitting. Whether any data-fitted preprocessing is used, such as feature standardisation, is still open (for example under `D-19`); if it is used, this rule applies.
+9. **Data-fitted preprocessing.** Any preprocessing step whose parameters are estimated from data (for example, feature standardisation statistics) is **refitted on the full official training partition** (all 1,258 videos) for the final models. It is **never** fitted using the test partition. Pose normalisation (`D-12`, resolved, Section 9.4) estimates no parameters across videos, so it needs no refitting. In Release 1.0 the only data-fitted step is the class weighting of the temporal CNN's loss (Section 9.5.3), which is refitted in Stage B. No input standardisation is used. Feature standardisation for the deferred classical models (`D-19`) would follow this rule.
 10. **Corruption model unchanged.** The corruption model used in C4 and C5 remains derived **exclusively from the original fitting subset** (Section 8.1). Validation residuals are not used to fit or calibrate it, even though validation videos join the final training data.
 11. **Shared seeds.** The same model-initialisation and training seeds are used across comparable conditions wherever technically possible. Seed *k* for C3 and C5 uses the same seed value as seed *k* for the shared C1/C2/C4 model.
 12. **Test partition untouched.** The official test partition is used in neither Stage A nor Stage B. It is used only for final evaluation of the Stage B models (Section 4.3).
@@ -202,11 +227,21 @@ For the **primary** controlled comparison, model development proceeds in two sta
 
 ## 5. Pose-estimation methodology
 
-### 5.1 Estimator **[PROPOSED]**
+### 5.1 Estimator **[ESTABLISHED, v0.11]**
 
-- **Planned estimator:** pretrained **RTMPose** (Jiang et al., 2023), an MMPose-based top-down 2D pose estimator that outputs 17 keypoints in the COCO format.
+- **Estimator:** pretrained **RTMPose** (Jiang et al., 2023), an MMPose-based top-down 2D pose estimator that outputs 17 keypoints in the COCO format.
 - **No fine-tuning [ESTABLISHED]:** the estimator is **not** fine-tuned or adapted on Penn Action. Its errors therefore reflect an off-the-shelf estimator applied to a new domain.
-- **Unconfirmed [OPEN]:** the exact RTMPose variant and model size, its training data, the checkpoint file and its checksum, the input resolution, and the inference implementation (`D-03`, `D-04`).
+- **Variant (`D-03`, resolved in v0.11):** **RTMPose-M**, input 256 × 192, configuration `rtmpose-m_8xb256-420e_coco-256x192.py`, checkpoint `rtmpose-m_simcc-coco_pt-aic-coco_420e-256x192-d8dd5ca4_20230127.pth` (SHA-256 `929f00f2d84764aa0297decf13a84556642e43cbf5fca8cfb16e7326d92dfd97`). Its training history (COCO; pretraining on COCO and AI Challenger, partly inferred from file names) is recorded in `docs/POSE_ESTIMATION_SETUP.md`. **Rationale:** a mid-sized official RTMPose checkpoint, chosen before any Penn Action inference, that runs on the project's 8 GB GPU (verified in the smoke tests) and is a standard, widely used top-down estimator. Other sizes were not evaluated, and the choice was not tuned on Penn Action. The licensing of the checkpoint remains a separate open question (`D-30`).
+- **Inference implementation (`D-04`, resolved in v0.11):**
+  - a separate, locked environment (`environments/rtmpose/`; MMPose 1.3.2, mmcv 2.1.0, PyTorch 2.1.2+cu121), kept apart from the main analysis environment;
+  - **one box per inference call** (per-frame inference; no batching), so batched-versus-per-frame equivalence does not arise;
+  - flip test on; FP32 only; cuDNN benchmark off; cuDNN deterministic on; TF32 off;
+  - images passed as file paths;
+  - boxes passed explicitly as `xyxy` after the D-05 rules (Section 5.2.2);
+  - all 17 keypoints and their scores stored (Section 5.3);
+  - a sample of frames cross-checked on CPU.
+
+  These are the settings listed as proposed in `configs/pose/rtmpose_m.yaml` (`proposed_freeze`). That file's status fields are not changed by this protocol revision; updating them requires a separate, approved configuration change.
 
 ### 5.2 Person localisation **[ESTABLISHED]**
 
@@ -406,7 +441,7 @@ Both partner copying and the `c_v` fallback remain approximations, not recovered
 
 **Remaining limitation.** Invisible coordinates that are not placeholders are often frozen (Section 5.5.1), whereas estimated poses move. This artefact remains in ground-truth inputs and may slightly widen differences such as C1 versus C2 (Section 12).
 
-**Interaction with other decisions.** D-07b is applied at the original frame rate, before temporal preprocessing (`D-20`, open) and before normalisation (Section 9.4.3). It does not depend on how D-20 is resolved. Because the D-12 normalisation is computed from boxes rather than joints, D-07b changes only the coordinate values being normalised.
+**Interaction with other decisions.** D-07b is applied at the original frame rate, before temporal preprocessing (`D-20`, resolved in v0.11) and before normalisation (Section 9.4.3). It does not depend on how D-20 was resolved. Because the D-12 normalisation is computed from boxes rather than joints, D-07b changes only the coordinate values being normalised.
 
 #### 5.5.4 RTMPose invalid keypoints (`D-34a` resolved in v0.10; `D-34b` open)
 
@@ -570,6 +605,8 @@ The five conditions are fixed and are reproduced exactly:
 - **C4:** Ground-truth poses for training and artificially corrupted testing poses.
 - **C5:** Ground-truth poses with corruption augmentation for training, and estimated poses for testing.
 
+**Release 1.0 (Section 1.4):** C1, C2 and C3 are run. C4 and C5 are **deferred** [DEFERRED]; their definitions above are unchanged.
+
 ### 7.1 Summary table
 
 | Condition | Training poses | Test poses | Final model (per seed) | Role in the study |
@@ -596,19 +633,21 @@ All poses use the 12-joint primary representation (Section 6.1). All final model
 
 **[ESTABLISHED]** The same per-video pose normalisation is applied in every condition, and a given video receives the identical transform in C1–C5 (`D-12`, Section 9.4).
 
-**[PROPOSED]** The same temporal preprocessing (`D-20`) is applied in every condition, and all preprocessing steps, including corruption and normalisation, follow the fixed, documented order in Section 9.4.3.
+**[ESTABLISHED, v0.11]** The same temporal preprocessing (`D-20`, resampling to 64 frames; Section 9.5.1) is applied in every condition, and all preprocessing steps, including corruption and normalisation, follow the fixed, documented order in Section 9.4.3.
 
 ### 7.3 Validation data in C3 and C5 (resolved) **[ESTABLISHED]**
 
 Validation data with the condition's own pose source (estimated poses for C3; ground-truth poses with or without corruption for C5) does **not** determine model selection in the primary experiment. It may be logged for descriptive monitoring only, during Stage A (Section 4.4). In Stage B the validation videos are part of the training data, so no validation monitoring takes place. Which descriptive validation metrics are logged will be recorded in the run configuration (`D-13`, resolved).
 
-### 7.4 Test-time corruption sampling in C4 **[PROPOSED]**
+### 7.4 Test-time corruption sampling in C4 **[PROPOSED; DEFERRED from Release 1.0]**
 
-For each severity level, C4 uses **multiple fixed corruption draws**, each generated from its own recorded seed, rather than a single random draw. Each final ground-truth-trained model (shared with C1 and C2) is evaluated on every draw. Repeated draws make it possible to separate the effect of **corruption severity** from the **random sampling variation** of any one particular corrupted test set. The number of draws per severity remains open (`D-14`). The numerical seeding scheme for corruption draws, including whether a draw's source assignment is reused across severity levels, is decided together with D-14 (`D-15b`, open; Section 8.2.3).
+For each severity level, C4 uses **multiple fixed corruption draws**, each generated from its own recorded seed, rather than a single random draw. Each final ground-truth-trained model (shared with C1 and C2) is evaluated on every draw. Repeated draws make it possible to separate the effect of **corruption severity** from the **random sampling variation** of any one particular corrupted test set. The number of draws per severity (`D-14`) and the numerical seeding scheme for corruption draws, including whether a draw's source assignment is reused across severity levels (`D-15b`; Section 8.2.3), are decided together and are **deferred** with C4 (Section 14.3).
 
 ---
 
 ## 8. Artificial corruption methodology
+
+**[DEFERRED from Release 1.0]** C4, C5, the residual bank and artificial corruption are not part of Release 1.0 (Section 1.4). The methodology below, including the resolved decisions `D-06a`, `D-15a` and `D-18`, is retained unchanged for a later release. The residual definition of Section 8.2.1 is still used in Release 1.0 to report pose-estimation error (Section 5.4).
 
 ### 8.1 Principles **[ESTABLISHED]**
 
@@ -627,7 +666,7 @@ For each severity level, C4 uses **multiple fixed corruption draws**, each gener
 2. Compute residuals as defined in Section 8.2.1 (`D-06a`) and store them in the residual bank described in Section 8.2.2 (`D-18`).
 3. Generate corruption by **resampling measured, contiguous whole-pose residual sequences** from the bank (`D-15a`, resolved in v0.10; Section 8.2.3). No parametric error model is fitted. The candidate families considered were independent per-joint Gaussian or empirical distributions, models with x–y correlation, models with temporal correlation, models with outliers or left/right swaps, and resampling of measured sequences.
 4. Define a set of severity levels, for example by scaling the fitted error model (`D-16`).
-5. **C4:** apply corruption at each severity level to ground-truth test poses, using multiple fixed, recorded corruption draws (Section 7.4, `D-14`). The seeding scheme is open under `D-15b`.
+5. **C4:** apply corruption at each severity level to ground-truth test poses, using multiple fixed, recorded corruption draws (Section 7.4, `D-14`). The seeding scheme is `D-15b` (deferred).
 6. **C5:** apply corruption stochastically to ground-truth training poses during training, with an augmentation probability and severity range to be decided (`D-17`). The augmentation settings are chosen without reference to C5 validation or test performance.
 
 #### 8.2.1 Residual definition (`D-06a`, resolved in v0.9) **[ESTABLISHED]**
@@ -661,7 +700,7 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
 - **Training evidence on missing data** (ground-truth side only): 76.8% of primary-joint entries in the training partition have a visible, non-placeholder ground truth. Only 21.5% of frames have all 12 primary joints visible, so restricting the bank to fully observed frames would be impractical and biased by class. Missing data on the estimator side is unknown until inference.
 - **Limitation:** errors at occluded joints are never measured, so the corruption may understate them (Section 12).
 
-#### 8.2.3 Corruption sampling (`D-15a` resolved in v0.10; `D-15b` open)
+#### 8.2.3 Corruption sampling (`D-15a` resolved in v0.10; `D-15b` deferred)
 
 **D-15a (resolved in v0.10) [ESTABLISHED].** Corruption is generated by **non-parametric resampling of measured, contiguous whole-pose residual sequences**. No parametric error model is fitted, and no Gaussian or independence assumption is made. This is a documented method; it has **not** yet been implemented or run.
 
@@ -687,7 +726,7 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
    - **ũ**<sub>t,j</sub> = **u**<sub>t,j</sub> + *k* · **E**<sub>t,j</sub> if **A**<sub>t,j</sub> is true;
    - otherwise **ũ**<sub>t,j</sub> = **u**<sub>t,j</sub>: **no residual is added where no measured residual is available**.
 
-   Here **u** is the D-12-normalised ground-truth pose (after `D-07b`) and *k* is the severity multiplier (`D-16`, open). Whether a C5 training example is corrupted, and at which severity, is `D-17` (open).
+   Here **u** is the D-12-normalised ground-truth pose (after `D-07b`) and *k* is the severity multiplier (`D-16`, deferred). Whether a C5 training example is corrupted, and at which severity, is `D-17` (deferred).
 
 **Guarantees.**
 - **No wrap-around:** a source is never read past its end.
@@ -698,7 +737,7 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
 
 **Logging (for every sampled target).** The target identifier and length; the case used (single window or concatenation); the source identifiers in order; the offset (single window); the seam positions (concatenation); the coverage (fraction of the T × 12 entries with a measured residual); the severity *k*; and the seed identifier under the `D-15b` scheme.
 
-**D-15b (open): numerical seeding scheme.** How generators are seeded for C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels, is decided together with `D-14` (number of draws). It is not fixed here.
+**D-15b (deferred with C4 and C5): numerical seeding scheme.** How generators are seeded for C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels, is decided together with `D-14` (number of draws). It is not fixed here.
 
 **Measurements planned after Penn Action inference (descriptive; fitting subset only; none has been run):**
 - **E2:**
@@ -725,7 +764,7 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
 
 As a descriptive diagnostic, which does not change the conditions, the distribution of synthetic residuals can be compared with that of real RTMPose residuals **within the fitting subset**. Comparing C4 and C2 performance at the end of the study is a reported outcome. It may **not** be used to retune the corruption model after test results are seen.
 
-### 8.4 Unresolved questions **[OPEN]**
+### 8.4 Unresolved questions **[DEFERRED from Release 1.0]**
 
 - *(The corruption family, gap handling and sequence sampling are now resolved: `D-15a`, Section 8.2.3.)*
 - The numerical seeding scheme for corruption sampling (`D-15b`), decided together with `D-14`.
@@ -740,12 +779,12 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 
 ### 9.1 Planned model families **[ESTABLISHED]**
 
-| Model | Role | Input form **[OPEN]** |
-|---|---|---|
-| Majority-class baseline | Lower bound; chance-level reference given class imbalance | None (uses training label distribution only) |
-| Logistic regression | Linear classical model | Fixed-length per-video feature vector built from the 12-joint representation (`D-19`) |
-| Random forest | Non-linear classical model | Fixed-length per-video feature vector built from the 12-joint representation (`D-19`) |
-| Small temporal CNN | Model that operates over time | Fixed- or variable-length sequence of 12-joint coordinates (`D-20`) |
+| Model | Role | Input form | Release 1.0 |
+|---|---|---|---|
+| Majority-class baseline | Lower bound; chance-level reference given class imbalance | None (uses training label distribution only) | **Included** |
+| Logistic regression | Linear classical model | Fixed-length per-video feature vector built from the 12-joint representation (`D-19`) | **[DEFERRED]** |
+| Random forest | Non-linear classical model | Fixed-length per-video feature vector built from the 12-joint representation (`D-19`) | **[DEFERRED]** |
+| Small temporal CNN | Model that operates over time | Sequence of 12-joint coordinates resampled to 64 frames (`D-20`) | **Included: primary learned model** (Section 9.5) |
 
 ### 9.2 Model selection and consistency across conditions **[ESTABLISHED]**
 
@@ -758,14 +797,12 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 
 ### 9.3 Unspecified details **[OPEN]**
 
-- Exact temporal CNN architecture: depth, kernel sizes, channels, pooling and regularisation (`D-21`).
-- Hyperparameter search spaces, search method (such as grid or random search) and budget, all applied on C1 validation (`D-22`).
-- Temporal preprocessing for sequences of different lengths: resampling to a fixed length, padding or cropping (`D-20`).
+- *(Temporal CNN architecture, tuning procedure and temporal preprocessing are now resolved: `D-21`, `D-22`, `D-20`, Section 9.5.)*
 - *(Pose normalisation is now resolved: `D-12`, Section 9.4.)*
 - *(Representation of invisible ground-truth joints in model input is now resolved: `D-07b`, Section 5.5.3.)* Visibility flags are never inputs, and ground-truth visibility is never applied to estimated poses (`D-07a`).
 - Representation of invalid RTMPose keypoints in model input: validity checks and same-joint temporal imputation resolved (`D-34a`); fallback steps 2–4 provisional pending measurement E1 (`D-34b`, Section 5.5.4).
-- Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`).
-- Class-imbalance handling, such as class weighting (`D-24`).
+- Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`, deferred with those models).
+- *(Class-imbalance handling is now resolved: `D-24`, Section 9.5.)*
 
 ### 9.4 Pose-coordinate normalisation (`D-12`, resolved in v0.7) **[ESTABLISHED]**
 
@@ -801,20 +838,82 @@ The proposed order of preprocessing steps is listed below. Where a step depends 
 
 1. **Joint mapping** to the 12-joint primary representation (`D-09`, `D-11`).
 2. **Unreliable coordinates:** corner placeholders in ground-truth poses (`D-07b`, resolved in v0.9; ground-truth poses only; Section 5.5.3) and RTMPose invalid keypoints (`D-34a` resolved, `D-34b` open; estimated poses only; Section 5.5.4). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions.
-3. **Corruption** (C4 and C5 only; `D-15a` and `D-18` resolved, Sections 8.2.2–8.2.3; `D-14`, `D-15b`, `D-16` and `D-17` open).
+3. **Corruption** (C4 and C5 only, so not used in Release 1.0; `D-15a` and `D-18` resolved, Sections 8.2.2–8.2.3; `D-14`, `D-15b`, `D-16` and `D-17` deferred).
 4. **Per-video normalisation** (`D-12`, this section).
-5. **Temporal preprocessing** (`D-20`, open). Corruption is placed before this step because the residual sequences resampled under `D-15a` (Section 8.2.3) are defined at the original frame rate.
-6. **Feature construction and any data-fitted standardisation** (`D-19`, open; Section 4.4, Stage B, item 9).
+5. **Temporal preprocessing** (`D-20`, resolved in v0.11: resampling to 64 frames; Section 9.5.1). Corruption is placed before this step because the residual sequences resampled under `D-15a` (Section 8.2.3) are defined at the original frame rate.
+6. **Feature construction and any data-fitted standardisation** (Release 1.0: none for the temporal CNN; classical-model features `D-19` deferred; Section 4.4, Stage B, item 9).
 
 **Corruption and normalisation.** The normalisation is a per-video translation plus a uniform scaling. If a corruption residual `e` is expressed in units of the same per-video scale `s_v`, then adding `e · s_v` in pixel space before normalisation gives exactly the same result as adding `e` after it: `((p + e · s_v) − c_v) / s_v = (p − c_v) / s_v + e`. In that case the two steps can be applied in either order. **This equivalence holds only when corruption is expressed in compatible per-video scale units.** It does not hold in general, for example for residuals expressed in pixels or in a per-frame scale. *(Updated in v0.9.)* Residuals are now expressed in units of `s_v` (`D-06a`, resolved; Section 8.2.1), so this condition is met for corruption built from them. The corruption method adopted under `D-15a` (Section 8.2.3) resamples residuals in these units, so the equivalence holds for it.
 
-#### 9.4.4 Pre-registered sensitivity analysis S1 (secondary)
+#### 9.4.4 Pre-registered sensitivity analysis S1 (secondary) **[DEFERRED from Release 1.0]**
 
 - **Representation:** per-frame **hip-midpoint centring** with a **per-video body scale**.
 - **Computed from the pose actually supplied to the model:** ground truth in C1, estimated poses in C2, C3 and C5 testing, and corrupted ground truth in C4. A reference derived from ground truth is **never** applied to estimated poses, consistent with `D-07a` rule 4.
 - **Timing:** run only **after the primary analysis is complete**, with all primary settings frozen (no retuning). It is reported as a secondary analysis and does not replace the primary result.
 - **Purpose:** to test whether conclusions depend on the coordinate representation. Under S1, estimator error in the hip joints also shifts the reference point, so differences between S1 and the primary result are themselves informative.
 - **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with `D-07b` (resolved in v0.9), `D-34a` (resolved in v0.10) and the eventual `D-34b` decision.
+
+### 9.5 Release 1.0 recogniser specification (resolved in v0.11) **[ESTABLISHED]**
+
+#### 9.5.1 Input and temporal preprocessing (`D-20`)
+
+- **Input:** the 12 primary joints after the D-07b (ground truth) or D-34 (estimates) handling and the D-12 per-video normalisation, giving 24 channels per frame (x and y of each joint, in the primary joint order of Section 6.2). **Coordinates only:** no confidence scores (`D-23`), no visibility flags (`D-07a`), no velocities and no other derived features.
+- **Fixed length by resampling:** every sequence of N frames is resampled to **T = 64** frames by linear interpolation in time, separately for each coordinate. The sample positions are t<sub>k</sub> = k · (N − 1) / 63, for k = 0, …, 63, on the original frame index scale. A single-frame sequence is repeated. 64 is close to the median training length (57 frames; range 18–657, training partition), so most sequences change length only modestly.
+- **Order:** resampling is the last preprocessing step, after normalisation (Section 9.4.3). It is identical in every condition.
+- **No data augmentation** in Release 1.0, and **no data-fitted input standardisation**. D-12 already places coordinates on a common scale. The only quantity fitted on training data is the class weighting (Section 9.5.3).
+- **Assumption:** frames are treated as comparable time steps across videos (Section 12).
+
+#### 9.5.2 Architecture (`D-21`)
+
+A deliberately small one-dimensional temporal convolutional network:
+
+| Layer | Specification |
+|---|---|
+| Input | 24 channels × 64 frames |
+| Block 1 | Conv1d (24 → 64 channels, kernel 5, padding 2, no bias) → BatchNorm → ReLU → Dropout (*p*) → MaxPool (2) |
+| Block 2 | Conv1d (64 → 128, kernel 5, padding 2, no bias) → BatchNorm → ReLU → Dropout (*p*) → MaxPool (2) |
+| Block 3 | Conv1d (128 → 128, kernel 5, padding 2, no bias) → BatchNorm → ReLU → Dropout (*p*) |
+| Pooling | Global average over time |
+| Output | Dropout (*p*) → Linear (128 → 15 classes) |
+
+About **133,000 parameters** (133,135 by direct count). The architecture is fixed; only the hyperparameters in Section 9.5.4 are selected. The same architecture is used in every condition.
+
+#### 9.5.3 Training (`D-24`, `D-25`)
+
+- **Loss:** cross-entropy with **class weights** w<sub>c</sub> = N / (K · N<sub>c</sub>), where N is the number of training videos in that run, K = 15 is the number of classes and N<sub>c</sub> is the number of training videos of class *c*. The weights are computed from the training labels of each run: the fitting subset in Stage A, the full training partition in Stage B. This is a data-fitted step, refitted in Stage B as Section 4.4 item 9 requires. **Rationale:** the primary metric, macro-F1, weights every class equally, and training class sizes range from 40 to 135 videos.
+- **Optimiser:** AdamW with a **constant learning rate** (no schedule), so that an epoch count selected in Stage A means the same thing in Stage B. Batch size 32. Training videos are shuffled each epoch by a seeded generator.
+- **Seeds (`D-25`):** three seeds, **0, 1 and 2**. A seed controls weight initialisation, data order and dropout. The same three seed values are used in Stage A and Stage B, and for C1/C2 and C3. Seeding and determinism follow Section 11.3. Three seeds give a first indication of training variability; they **do not establish** seed stability (Section 12).
+- **Majority-class baseline:** predicts the most frequent class in the training set of the run. It has no hyperparameters or seeds.
+
+#### 9.5.4 Model selection on C1 validation (`D-22`)
+
+- **Search:** a full grid of **8 configurations**: learning rate ∈ {0.001, 0.003} × weight decay ∈ {0.0001, 0.001} × dropout *p* ∈ {0.1, 0.3}.
+- **Stage A selection runs:** each configuration is trained with each of the 3 seeds on **ground-truth poses of the fitting subset** (1,070 videos) for at most **150 epochs**. Macro-F1 on **ground-truth poses of the validation subset** (188 videos) is recorded every 5 epochs (epochs 5, 10, …, 150). That is 24 runs in total.
+- **Selection rule:** choose the configuration and epoch count *E* with the highest **mean validation macro-F1 across the 3 seeds**. Ties are broken by the smaller *E*, then the smaller learning rate, then the smaller weight decay, then the smaller dropout.
+- **Frozen settings:** the selected configuration and *E* are recorded in a versioned configuration file before Stage B, and then used unchanged in every condition (Section 4.4).
+
+#### 9.5.5 Validation representation across C1, C2 and C3
+
+| Condition | Stage A (fitting → validation) | Stage B (all 1,258 training videos → test) |
+|---|---|---|
+| **C1** | Trained on ground truth (fitting); evaluated on **ground-truth** validation poses. **This is the only result used for selection.** | One model per seed trained on ground truth for *E* epochs; tested on ground-truth test poses |
+| **C2** | The C1 Stage A models evaluated on **estimated** validation poses: **descriptive only** | The **same** final models as C1; tested on estimated test poses |
+| **C3** | Trained with the frozen settings on **estimated** poses (fitting); evaluated on estimated validation poses: **descriptive only** | One model per seed trained on estimated poses for *E* epochs; tested on estimated test poses |
+
+C2 and C3 validation results are logged but **never** used to change any setting (`D-13`). In Stage B there is no validation monitoring and no early stopping (`D-33`).
+
+#### 9.5.6 Comparable budgets across conditions
+
+C1/C2 and C3 use the same architecture, frozen hyperparameters, epoch count *E*, batch size, optimiser, class-weighting rule, preprocessing pipeline and seed values. The only differences are the pose source used for training and testing.
+
+#### 9.5.7 Freeze before test evaluation
+
+Before any test label or test pose output is opened:
+- the Stage A selection record and the Stage B configuration are committed to Git;
+- all Stage B models are trained;
+- the code commit is recorded.
+
+Test labels and test pose outputs are read **only** by the final evaluation step, which runs once on the frozen models (Section 4.3).
 
 ---
 
@@ -829,7 +928,7 @@ The proposed order of preprocessing steps is listed below. Where a step depends 
 ### 10.2 Training seeds **[ESTABLISHED / PROPOSED]**
 
 - **[ESTABLISHED]** Training is repeated with **multiple random seeds** for each model and condition, with seeds shared across comparable conditions (Section 4.4).
-- **[PROPOSED]** The proposed starting point is **five training seeds**. Final confirmation remains open (`D-25`).
+- **[ESTABLISHED, v0.11]** Release 1.0 uses **three training seeds** (0, 1, 2) (`D-25`, Section 9.5.3). More seeds may be added in a later release, using the same procedure. The earlier proposal of five seeds is superseded for Release 1.0.
 - For deterministic procedures where the seed has little or no effect, such as some logistic-regression solvers, this will be noted rather than reporting identical repeats as independent evidence.
 
 ### 10.3 Paired comparisons between conditions **[ESTABLISHED]**
@@ -842,7 +941,7 @@ All conditions are evaluated on the **same test videos**, so comparisons between
 4. compute the **paired difference** in macro-F1 for each resample;
 5. report the paired difference and its confidence interval.
 
-**[OPEN]** The number of bootstrap resamples (`D-26`) and the confidence-interval method, such as percentile or BCa (`D-27`).
+The number of resamples (`D-26`) and the interval method (`D-27`) are now resolved (Section 10.7).
 
 ### 10.4 Sources of variability **[ESTABLISHED]**
 
@@ -851,14 +950,14 @@ Two sources of variability are kept **distinct**:
 - **training-seed variability:** variation across models trained with different seeds;
 - **test-video sampling variability:** uncertainty because the test set is a finite sample, estimated by the bootstrap.
 
-**[PROPOSED]** Both are reported separately, for example a bootstrap confidence interval per seed alongside the spread across seeds. They are combined into a single interval only if a clearly specified combined procedure is adopted and documented in advance (`D-27`).
+**[PROPOSED]** Both are reported separately, for example a bootstrap confidence interval per seed alongside the spread across seeds. They are combined into a single interval only if a clearly specified combined procedure is adopted and documented in advance (`D-27`). *Release 1.0:* the pre-specified procedure is in Section 10.7. Its interval reflects test-video sampling only; seed variation is reported separately.
 
 For C4, corruption-draw variability (Section 7.4) is a third source. It is reported separately in the same way.
 
 ### 10.5 Planned comparisons and multiple testing **[PROPOSED]**
 
-- The family of planned confirmatory comparisons is pre-specified by hypotheses H1–H5. H6 is exploratory.
-- The approach to multiple comparisons, whether a correction method or explicit labelling as exploratory, is to be decided (`D-28`).
+- The family of planned confirmatory comparisons is pre-specified by hypotheses H1–H5. H6 is exploratory. *Release 1.0:* the planned comparisons are **H1 and H2** only; H3–H5 are deferred (Section 2.2).
+- Multiple comparisons in Release 1.0: resolved (`D-28`, Section 10.7).
 - Effect sizes (paired differences in macro-F1 with confidence intervals) are prioritised over significance tests alone.
 
 ### 10.6 Secondary and exploratory analyses
@@ -867,7 +966,7 @@ For C4, corruption-draw variability (Section 7.4) is a third source. It is repor
 
 - Per-class performance (per-class F1, confusion matrices) for each condition.
 - Pose-estimation error by joint for the 12 primary joints (Section 5.4). During design this is computed on the fitting subset; the test partition is analysed only after all design decisions are frozen.
-- Normalisation sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, run only after the primary analysis with primary settings frozen (Section 9.4.4, `D-12`).
+- Normalisation sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, run only after the primary analysis with primary settings frozen (Section 9.4.4, `D-12`). **[DEFERRED from Release 1.0]**
 
 **[PROPOSED]** Exploratory analyses that are labelled as such:
 
@@ -878,6 +977,30 @@ For C4, corruption-draw variability (Section 7.4) is a third source. It is repor
 - breakdowns by joint visibility;
 - the exploratory head analysis (Section 6.3), if performed;
 - condition-specific tuning (Section 4.4), as a secondary analysis.
+
+*Release 1.0* reports per-class F1 and confusion matrices, per-joint pose error (Section 5.4.1) and the H6 analysis. The other exploratory items above are optional, and any that are reported will be labelled exploratory.
+
+### 10.7 Release 1.0 statistical plan (resolved in v0.11) **[ESTABLISHED]**
+
+**Planned comparisons (`D-28`).** Two, both on the temporal CNN with macro-F1 as the metric:
+- **H1:** C1 versus C2;
+- **H2:** C3 versus C2.
+
+Each is reported as a paired difference in macro-F1 with a 95% interval. Because there are two planned comparisons, Bonferroni-adjusted 97.5% intervals are also reported. Conclusions rest on effect sizes and intervals, not on significance tests. Accuracy, per-class results, per-joint pose error and H6 are secondary or exploratory, with no multiplicity adjustment. The majority-class baseline is reported descriptively as a floor.
+
+**Bootstrap (`D-26`).** The paired, class-stratified video-level bootstrap of Section 10.3, with **B = 10,000** resamples drawn from a fixed, recorded seed. The **same** resampled video identifiers are used for every condition and seed within a comparison.
+
+**Intervals (`D-27`).** Percentile intervals.
+
+**Pre-specified procedure for three seeds:**
+1. For seed *s* and comparison (A versus B), compute the per-seed difference d<sub>s</sub> = macro-F1(A, *s*) − macro-F1(B, *s*) on the full test set.
+2. **Point estimate:** the mean of d<sub>s</sub> over the three seeds.
+3. **Interval for test-video sampling:** on each bootstrap resample, compute d<sub>s</sub> for every seed on the same resampled videos and average them over the seeds. The 2.5th and 97.5th percentiles of these averages give the 95% interval (the 1.25th and 98.75th give the 97.5% interval).
+4. **Seed variation, reported separately:** the three per-seed differences d<sub>s</sub>, their range and standard deviation, and the per-seed bootstrap interval for each seed.
+
+**What the interval means.** It reflects uncertainty from the finite test set, with the three trained models held fixed. It does **not** include training-seed uncertainty. Three seeds are too few to estimate that reliably, so seed variation is shown separately and is not presented as evidence of stability (Section 12).
+
+**Per-condition results:** for each condition, macro-F1 and accuracy are reported per seed and as the mean over seeds, each with a percentile bootstrap interval computed in the same way.
 
 ---
 
@@ -892,7 +1015,7 @@ Recorded in `environment-info.txt` and `requirements.txt` at the time of writing
 - Windows 11 Home (build 26300), 64-bit; pip 26.3;
 - relevant libraries include NumPy 2.4.6, pandas 3.1.1, SciPy 1.17.1, scikit-learn 1.9.1, OpenCV 5.1.0.95, PyYAML 6.0.3, matplotlib 3.11.2 and seaborn 0.13.2.
 
-**Note:** `requirements.txt` does not yet include any pose-estimation inference dependency, such as an MMPose-based stack or a standalone RTMPose runtime. This depends on `D-04` and must be added and pinned before pose estimation begins.
+**Note (updated in v0.11, `D-04`):** pose-estimation inference runs in a **separate, locked environment**, documented in `environments/rtmpose/` (lock file `requirements-rtmpose.lock.txt`; environment information `environment-info-rtmpose.txt`). It is deliberately **not** added to `requirements.txt`, which describes the main analysis environment only.
 
 ### 11.2 Proposed logging practice **[PROPOSED]**
 
@@ -943,6 +1066,8 @@ This protocol is version-controlled. Any change after experiments begin is recor
 - **Ground-truth annotation noise:** Penn Action annotations are themselves imperfect, so "error" is measured relative to a noisy reference.
 - **Invisible joints** do not have reliable ground-truth coordinates: some are corner placeholders, and the rest are plausible but often frozen (Section 5.5.1; corrected in v0.9). They are excluded from error measurement and corruption fitting (`D-07a`). As a result, estimator accuracy on occluded or out-of-frame joints is not measured against ground truth, and the corruption model is fitted only on visible joints, so it may understate errors at occluded joints (`D-18`). In recogniser inputs, corner placeholders are replaced by approximations (partner track or video centre), not recovered ground truth, and frozen invisible coordinates remain (`D-07b`). Both may affect ground-truth versus estimated-pose comparisons such as C1 versus C2.
 - **Synthetic corruption fidelity:** the corruption model may not capture all properties of real estimator errors, such as temporal correlation, structured failures or left/right swaps. This limits how far C4 results generalise.
+- **Release 1.0 scope (Section 1.4):** results come from **one** learned recogniser (a small temporal CNN), so they may not generalise to other recogniser families; H5 is deferred. Only **three** training seeds are used, so training-seed variability is shown but not reliably estimated. Without C4 and C5, Release 1.0 measures the effect of real estimation error but not a controlled severity curve or augmentation.
+- **Fixed-length resampling:** resampling every video to 64 frames (`D-20`) compresses long videos and stretches short ones, which may blur fast movements in long sequences.
 - **Under-corruption from G0 gap handling:** where no measured residual exists, no corruption is added (`D-15a`, Section 8.2.3). About 23% of primary-joint entries lack a measured residual on the ground-truth side alone (training partition), so C4 and C5 corruption may be milder than real estimation error, especially at occluded joints.
 - **Comparable time steps (unverified assumption):** Penn Action's frame rate is not recorded in the annotations. Resampling residual sequences across videos, and temporal preprocessing (`D-20`), assume that frames are comparable time steps across videos.
 - **Frozen hyperparameters transferred to a larger training set:** all hyperparameters, including the epoch count for the temporal CNN, are selected while training on ~85% of the training partition, then reused when refitting on 100%. The optimal values on the larger set may differ slightly. For example, the effective strength of regularisation can depend on the number of training samples, and the best training duration may change. No validation check is possible during refitting. This applies equally to all conditions.
@@ -987,6 +1112,17 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-35 *(v0.11)* | Release 1.0 scope | Release 1.0 runs **C1, C2 and C3**, with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest, H3–H5, S1, the head analysis and condition-specific tuning are **deferred, not removed**. Fixed before any pose inference, training or result. The research question, the C1–C5 definitions and all earlier resolved decisions are unchanged (Section 1.4). |
+| D-03 *(v0.11)* | RTMPose variant | **RTMPose-M**, 256 × 192; configuration and checkpoint SHA-256 values as recorded in Section 5.1 and `docs/POSE_ESTIMATION_SETUP.md`. Rationale: a mid-sized official checkpoint, chosen before any Penn Action inference, that runs on the project's 8 GB GPU and is a standard top-down estimator. Other sizes were not evaluated; not tuned on Penn Action. Licensing remains D-30. |
+| D-04 *(v0.11)* | Inference implementation | A separate, locked environment (`environments/rtmpose/`), not part of `requirements.txt`. One box per call (per-frame inference, no batching); flip test on; FP32; cuDNN benchmark off; deterministic on; TF32 off; file-path input; explicit `xyxy` boxes after D-05; all 17 keypoints and scores stored; a CPU cross-check on a sample. The YAML status fields are unchanged pending a separate, approved configuration change (Sections 5.1, 11.1). |
+| D-20 *(v0.11)* | Temporal preprocessing | Each sequence is resampled to **64 frames** by linear interpolation at t<sub>k</sub> = k(N − 1)/63, as the last preprocessing step, identically in every condition. No augmentation; no data-fitted input standardisation. Frames are assumed to be comparable time steps (Section 9.5.1). |
+| D-21 *(v0.11)* | Temporal CNN architecture | Three Conv1d blocks (24 → 64 → 128 → 128 channels, kernel 5, BatchNorm, ReLU, dropout; max-pool 2 after blocks 1 and 2), global average pooling, dropout, then a linear layer to 15 classes; about 133,000 parameters; fixed across conditions (Section 9.5.2). |
+| D-22 *(v0.11)* | Tuning procedure | A grid of 8: learning rate {0.001, 0.003} × weight decay {0.0001, 0.001} × dropout {0.1, 0.3}. AdamW with a constant learning rate, batch size 32. Each configuration is trained with 3 seeds on ground-truth fitting poses for up to 150 epochs, with ground-truth validation macro-F1 recorded every 5 epochs. The configuration and epoch count with the highest mean across seeds are selected (ties: smaller epoch count, then smaller learning rate, weight decay, dropout), then frozen for all conditions (Section 9.5.4). |
+| D-24 *(v0.11)* | Class imbalance | Class-weighted cross-entropy, w<sub>c</sub> = N/(K·N<sub>c</sub>), computed from the training labels of each run (fitting subset in Stage A; full training partition in Stage B) (Section 9.5.3). |
+| D-25 *(v0.11)* | Number of seeds | **Three seeds (0, 1, 2)** for Release 1.0, shared across stages and conditions. They do not establish seed stability; more may be added later (Sections 9.5.3, 10.2). |
+| D-26 *(v0.11)* | Bootstrap count | **B = 10,000** paired, class-stratified video-level resamples from a fixed, recorded seed (Section 10.7). |
+| D-27 *(v0.11)* | CI methodology | **Percentile** intervals. Pre-specified for three seeds: point estimate = the mean of the per-seed differences; interval = percentiles of the seed-averaged difference over shared resamples (test-video sampling only). Per-seed differences, their range and standard deviation, and per-seed intervals are reported separately (Section 10.7). |
+| D-28 *(v0.11)* | Multiple comparisons | Two planned comparisons in Release 1.0, **H1 (C1 vs C2)** and **H2 (C3 vs C2)**, on the temporal CNN with macro-F1, each with a 95% interval and a Bonferroni-adjusted 97.5% interval. Other analyses are secondary or exploratory, without adjustment. Effect sizes and intervals, not significance tests (Section 10.7). |
 | D-06b *(v0.10)* | PCK thresholds and AUC | Primary α = **0.05** × `s_v`; supplementary α = **0.10** × `s_v`; PCK curve at α = 0.00, 0.01, …, 0.20; normalised AUC = trapezoidal area over [0, 0.20] divided by 0.20 (range 0–1). Correct means error strictly below α × `s_v`. Denominator: eligible joint instances (visible, non-placeholder ground truth); invalid estimates count as incorrect. Euclidean-error statistics use valid estimates only, with the invalid rate reported separately. **Study-defined choices, not universal conventions**, justified by a training-partition scale analysis (forearm 0.121 × `s_v`; torso 0.270 × `s_v`; longer box side 0.909 × `s_v`). Fixed before any Penn Action pose-error result has been seen (Section 5.4.1). |
 | D-15a *(v0.10)* | Corruption family, gaps and sampling | Non-parametric resampling of **measured, contiguous whole-pose residual sequences** from the fitting-subset bank; no parametric model. **G0:** no residual added where none was measured. Sources: fitting videos other than the target with at least one measured residual, in identifier order. A single window from a source at least as long as the target (index, then offset drawn uniformly); otherwise deterministic concatenation of whole sequences in a drawn permutation, trimmed from the end of the last piece, with reuse only after every source has been used once; seams recorded. No wrap-around; no source–target overlap; no fabricated values. If no eligible source exists, sampling stops with an error (no silent empty or partial sequence). Logged per target: sources, offsets, seams, coverage, severity, seed identifier. Not yet implemented or run. Limitations: G0 under-corruption; comparable-time-step assumption (Section 8.2.3). |
 | D-34a *(v0.10)* | RTMPose invalid keypoints: validity, metrics and first imputation step | Invalid if score ≤ 0, score not finite, or a predicted coordinate not finite; a finite coordinate with score ≤ 0 is still invalid. Detection never uses the apparent location (which is finite and can lie inside the image). Native decoding and raw outputs are preserved for auditability. Invalid estimates are excluded from residuals, count as incorrect in PCK and are excluded from Euclidean-error statistics (invalid rate reported). Recogniser-input imputation step 1: same-joint linear interpolation in time, holding the nearest valid value at the ends. Repairs use estimator outputs and image size only; no frame or video is excluded (Section 5.5.4). |
@@ -1010,27 +1146,24 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | ID | Topic | Decision required |
 |---|---|---|
 | D-01 | Dataset verification | Confirm that the downloaded files match 2,326 videos, 15 classes, 13 joints and the 1,258/1,068 split; record any discrepancy. *Status (v0.9 audit):* label-level checks done (2,326 label files; 15 actions; 13 joints; 1,258/1,068 split). Known discrepancies include `dimensions` widths of 481/482 for 480-px frames, action names differing from the README, video 1865 having one box row fewer than its frames, and video 1516 (no visible joints; placeholder box). **Outstanding:** frame-level checks (2,326 frame folders; JPEG count equal to `nframes` per video; JPEG size consistent with `dimensions`). |
-| D-03 | RTMPose variant | Model size, its training data, input resolution, and checkpoint name and checksum. *Status (v0.9 audit):* variant, input size, configuration and checkpoint SHA-256 values, and training history (pretraining partly inferred) are documented in `docs/POSE_ESTIMATION_SETUP.md`. **Outstanding:** a recorded rationale for choosing the M size; the licensing question (D-30) remains a separate open risk. |
-| D-04 | Inference implementation | Software stack and version for running RTMPose; dependency pinning in `requirements.txt`. *Status (v0.9 audit):* a separate, locked RTMPose environment is documented (`environments/rtmpose/`). **Outstanding:** this row's wording, and Section 11.1, still refer to `requirements.txt`, which conflicts with the two-environment design; the proposed runtime settings in `configs/pose/rtmpose_m.yaml` (`proposed_freeze`) are not frozen; batched versus per-frame inference equivalence is untested. |
-| D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
-| D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). To be decided together with D-15b. |
-| D-15b | Corruption seeding scheme | The numerical seeding scheme for corruption sampling in C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels. To be decided together with D-14 (Sections 7.4, 8.2.3). |
-| D-16 | Severity levels | The number of severity levels and how each is defined. |
-| D-17 | C5 augmentation | Augmentation probability, severity range or schedule. |
-| D-19 | Classical-model features | The per-video feature representation for logistic regression and random forest. |
-| D-20 | Temporal preprocessing | Handling of variable sequence lengths (resampling, padding, cropping) and frame rate. |
-| D-21 | Temporal CNN architecture | Exact layers, sizes and regularisation. |
-| D-22 | Tuning procedure | Search spaces, search method, budget and epoch-selection rule, applied on C1 validation. |
-| D-24 | Class imbalance | Class weighting or other handling. |
-| D-25 | Number of seeds | Final number of training seeds; five is the proposed starting point. |
-| D-26 | Bootstrap count | Number of stratified, paired bootstrap resamples. |
-| D-27 | CI methodology | The interval type (e.g. percentile or BCa), and whether any combined seed-and-sample procedure is adopted. |
-| D-28 | Multiple comparisons | The correction method, or explicit labelling of exploratory comparisons. |
 | D-29 | Dataset terms | Record the Penn Action terms of use and citation requirements. |
 | D-30 | Estimator licensing | Record the RTMPose/MMPose code and weight licences. |
 | D-31 | Repository licence | Choose a licence for this repository's code. |
 | D-32 | Figures | Whether dataset frames may appear in published figures. |
 | D-34b | RTMPose invalid keypoints: fallback imputation | **Provisional, pending measurement E1:** step 2, when a keypoint is never valid in the video, copy the partner's estimated track only if it contains usable estimates after step 1 (at least one valid estimate); step 3, if the partner track is also entirely invalid, the per-video mean of the original valid estimated primary-keypoint observations (x and y averaged over valid joint-frame observations, before any imputation); step 4, if no primary keypoint is valid anywhere in the video, the image centre (video flagged, retained, reported). No ground-truth coordinates, visibility or box centres. E1, on the fitting subset after inference: invalid rate per joint and video; longest invalid run; never-valid tracks; frames with no valid primary keypoint; videos needing steps 2–4. Steps may be simplified if E1 shows they are never needed (Section 5.5.4). |
+
+### 14.3 Deferred to a later release **[DEFERRED]** (v0.11)
+
+These decisions are needed only for work outside the Release 1.0 scope (Section 1.4). They remain undecided and will be resolved before the corresponding work begins.
+
+| ID | Topic | Decision required |
+|---|---|---|
+| D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. Deferred with the exploratory head analysis. |
+| D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). To be decided together with D-15b. Deferred with C4. |
+| D-15b | Corruption seeding scheme | The numerical seeding scheme for corruption sampling in C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels. To be decided together with D-14 (Sections 7.4, 8.2.3). Deferred with C4 and C5. |
+| D-16 | Severity levels | The number of severity levels and how each is defined. If PCK is used, it must use the D-06b thresholds. Deferred with C4. |
+| D-17 | C5 augmentation | Augmentation probability, severity range or schedule. Deferred with C5. |
+| D-19 | Classical-model features | The per-video feature representation for logistic regression and random forest. Deferred with those models. |
 
 ---
 
