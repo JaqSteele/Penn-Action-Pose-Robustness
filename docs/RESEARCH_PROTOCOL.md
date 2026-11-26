@@ -1,7 +1,7 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.6 for review. Not final.
+**Document status:** Draft v0.7 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
 
@@ -15,6 +15,7 @@
 | v0.4 | 2026-11-26 | Resolved D-09 (left/right convention). Inspection of Penn Action training annotations and frames showed that columns labelled LEFT hold the subject's anatomical RIGHT, and vice versa. The Penn Action → COCO mapping therefore swaps every left/right pair (Sections 6.2, 6.4, 14). The original annotation files are unchanged; the swap belongs in project mapping code. Project-status line updated (dataset now stored locally). No other methodological decisions changed; D-11 remains open. |
 | v0.5 | 2026-11-26 | Resolved D-11 (joint column order). The 13-column order (1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles, 1-based) is recorded as an evidence-supported inference. It is not an explicitly documented fact: no inspected source states that list position *k* corresponds to array column *k*. New Section 6.5; Sections 6.2 and 14 updated. D-09 (left/right) is unchanged and kept separate. No other methodological decisions changed. |
 | v0.6 | 2026-11-26 | D-07 split into D-07a (resolved) and D-07b (open). D-07a records the visibility semantics: 0/1 values, meaning not documented; inferred to cover occluded and out-of-frame joints; invisible coordinates unreliable. It also sets the rules for error measurement (visible ground truth only), corruption fitting (visible residuals from the fitting subset only), recogniser inputs (no visibility flags; ground-truth visibility never applied to estimated poses) and test-set use (joint eligibility for evaluation only). D-07b keeps open how invisible ground-truth coordinates enter recogniser inputs (Option A or C), to be decided with D-12 and D-20. New open item D-34: how RTMPose invalid keypoints (score ≤ 0) are handled in recogniser inputs; linked to D-07b but separate from its Option A/C choice, and undecided. D-18 remains open. Sections 5.4, 5.5, 8.2, 9.3, 12 and 14 updated. No other methodological decisions changed. |
+| v0.7 | 2026-11-26 | Resolved D-12 (pose-coordinate normalisation). Primary recogniser input: per-video bounding-box normalisation, `(joint − c_v) / s_v`, where `c_v` is the median centre and `s_v` the median diagonal of that video's valid ground-truth boxes, with the same scale for x and y. The transform depends only on boxes, so it is identical for a given video in C1–C5. Within-video movement is preserved: no per-frame recentring or rescaling, rotation alignment or mirroring. Bounding boxes are recorded as supplied oracle information. Pre-registered secondary sensitivity analysis S1 (per-frame hip-midpoint centring with a per-video body scale), run only after the primary analysis. Proposed processing order recorded, dependent on open decisions. D-05, D-06, D-07b, D-19, D-20 and D-34 remain open; the proposal to express corruption residuals in per-video box-diagonal units is conditional on D-06. New Section 9.4; Sections 4.4, 5.5.3, 7.2, 8.2, 9.3, 10.6, 12 and 14 updated. No other methodological decisions changed. |
 
 ---
 
@@ -142,7 +143,7 @@ For the **primary** controlled comparison, model development proceeds in two sta
 6. **Shared final model for C1, C2 and C4.** For each seed, a single final ground-truth-trained model is fitted on ground-truth poses from the full training partition. That **same final model** is evaluated on ground-truth test poses (C1), estimated test poses (C2) and corrupted ground-truth test poses (C4). Only the test-time pose input changes.
 7. **Final model for C3.** C3 trains the same architecture with the frozen settings on **estimated** poses from the full official training partition.
 8. **Final model for C5.** C5 trains the same architecture with the frozen settings on **ground-truth** poses from the full official training partition, with **synthetic corruption augmentation**.
-9. **Data-fitted preprocessing.** Any preprocessing step whose parameters are estimated from data (for example, feature standardisation statistics) is **refitted on the full official training partition** (all 1,258 videos) for the final models. It is **never** fitted using the test partition. The specific preprocessing methods remain open under `D-12`.
+9. **Data-fitted preprocessing.** Any preprocessing step whose parameters are estimated from data (for example, feature standardisation statistics) is **refitted on the full official training partition** (all 1,258 videos) for the final models. It is **never** fitted using the test partition. Pose normalisation (`D-12`, resolved, Section 9.4) estimates no parameters across videos, so it needs no refitting. Whether any data-fitted preprocessing is used, such as feature standardisation, is still open (for example under `D-19`); if it is used, this rule applies.
 10. **Corruption model unchanged.** The corruption model used in C4 and C5 remains derived **exclusively from the original fitting subset** (Section 8.1). Validation residuals are not used to fit or calibrate it, even though validation videos join the final training data.
 11. **Shared seeds.** The same model-initialisation and training seeds are used across comparable conditions wherever technically possible. Seed *k* for C3 and C5 uses the same seed value as seed *k* for the shared C1/C2/C4 model.
 12. **Test partition untouched.** The official test partition is used in neither Stage A nor Stage B. It is used only for final evaluation of the Stage B models (Section 4.3).
@@ -263,7 +264,7 @@ How invisible ground-truth coordinates enter recogniser inputs remains undecided
 
 **Why it matters.** Invisible ground-truth coordinates contain annotation artefacts (Section 5.5.1) that a recogniser could learn in ground-truth conditions, but that do not occur in estimated poses. The choice may therefore affect comparisons such as C1 versus C2.
 
-This decision must be made together with `D-12` (normalisation) and `D-20` (temporal preprocessing), and before any test-set evaluation.
+This decision must be made together with `D-20` (temporal preprocessing), consistently with `D-12` (normalisation, resolved in v0.7, Section 9.4), and before any test-set evaluation. Because the D-12 normalisation is computed from bounding boxes rather than joints, the D-07b choice changes only the coordinate values being normalised, not the normalisation itself.
 
 **Related but separate: RTMPose invalid keypoints (`D-34`, open).** RTMPose sets the location of any keypoint with score ≤ 0 to −1 before converting it to image coordinates (see `docs/POSE_ESTIMATION_SETUP.md`, Section 4). How such keypoints are handled in recogniser inputs is a **separate unresolved preprocessing question**. It is linked to D-07b, because both concern unreliable coordinates in recogniser inputs, but it is **not** part of the Option A/C choice above. No decision on it has been made.
 
@@ -422,7 +423,9 @@ All poses use the 12-joint primary representation (Section 6.1). All final model
 - No confidence scores as recogniser inputs (Section 5.3).
 - Consistent treatment of visibility and missing joints (Section 5.5).
 
-**[PROPOSED]** The same pose normalisation and temporal preprocessing are applied in every condition, and the corruption and normalisation steps are performed in a fixed, documented order (`D-12`).
+**[ESTABLISHED]** The same per-video pose normalisation is applied in every condition, and a given video receives the identical transform in C1–C5 (`D-12`, Section 9.4).
+
+**[PROPOSED]** The same temporal preprocessing (`D-20`) is applied in every condition, and all preprocessing steps, including corruption and normalisation, follow the fixed, documented order in Section 9.4.3.
 
 ### 7.3 Validation data in C3 and C5 (resolved) **[ESTABLISHED]**
 
@@ -450,7 +453,7 @@ For each severity level, C4 uses **multiple fixed corruption draws**, each gener
 ### 8.2 Proposed procedure **[PROPOSED]**
 
 1. Run RTMPose on the **fitting subset** and map the output to the 12-joint primary representation (Sections 5–6).
-2. Compute residuals (estimated minus ground truth) per joint and per frame, in a normalised coordinate frame (`D-06`). Only residuals at **visible** ground-truth joints in the fitting subset are eligible. (0,0) placeholders are excluded (`D-07a`, Section 5.5).
+2. Compute residuals (estimated minus ground truth) per joint and per frame, in a normalised coordinate frame (`D-06`). *Proposal, conditional on D-06's decision:* express residuals in units of the per-video box diagonal `s_v` used for normalisation (Section 9.4.3). Only residuals at **visible** ground-truth joints in the fitting subset are eligible. (0,0) placeholders are excluded (`D-07a`, Section 5.5).
 3. Fit or summarise an error model from these residuals. Candidates are listed in `D-15`:
    - independent per-joint Gaussian or empirical distributions;
    - per-joint models that account for direction and correlation between the x and y coordinates;
@@ -499,11 +502,60 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 - Exact temporal CNN architecture: depth, kernel sizes, channels, pooling and regularisation (`D-21`).
 - Hyperparameter search spaces, search method (such as grid or random search) and budget, all applied on C1 validation (`D-22`).
 - Temporal preprocessing for sequences of different lengths: resampling to a fixed length, padding or cropping (`D-20`).
-- Pose normalisation: for example centring on the hip midpoint and scaling by torso length or box size (`D-12`).
+- *(Pose normalisation is now resolved: `D-12`, Section 9.4.)*
 - Representation of invisible ground-truth joints in model input (`D-07b`, Section 5.5.3). Visibility flags are never inputs, and ground-truth visibility is never applied to estimated poses (`D-07a`).
 - Representation of RTMPose keypoints with score ≤ 0 in model input (`D-34`, Section 5.5.3).
 - Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`).
 - Class-imbalance handling, such as class weighting (`D-24`).
+
+### 9.4 Pose-coordinate normalisation (`D-12`, resolved in v0.7) **[ESTABLISHED]**
+
+#### 9.4.1 Primary representation
+
+Recogniser inputs use **per-video bounding-box normalisation** of the 12-joint primary representation (Section 6; mapping per `D-09` and `D-11`). For each video *v*, using that video's **valid** ground-truth bounding boxes:
+
+- **Centre** `c_v`: the median, over valid boxes, of the box centres `((x1 + x2) / 2, (y1 + y2) / 2)`.
+- **Scale** `s_v`: the median, over valid boxes, of the box diagonals `sqrt((x2 − x1)² + (y2 − y1)²)`. The **same scale is used for x and y**, so body proportions and angles are preserved.
+- **Transform:** `normalised_joint = (joint_coordinate − c_v) / s_v`.
+
+What counts as a valid box, and the fallback for a video with no valid box, are **not** decided here. They remain open under `D-05`.
+
+Rules:
+
+1. **Identical across conditions.** The transform depends only on the video's ground-truth boxes, never on joint coordinates (ground-truth or estimated). The same per-video transform is therefore used in C1–C5.
+2. **Within-video movement is preserved.** There is **no** per-frame recentring, per-frame rescaling, rotation alignment or mirroring.
+3. **No parameters fitted across videos.** Each video is normalised using only its own boxes. Nothing is fitted on the training partition, so nothing is refitted in Stage B, and nothing is estimated from the test partition.
+
+**Supporting evidence** (empirical findings, training partition only, 1,258 videos; no test data used):
+
+- The per-video median box height ranges from 77 px to 294 px (5th to 95th percentile), a ratio of about 3.8. Raw pixel coordinates would therefore mix in large differences in subject scale.
+- Within videos, the box diagonal is the most stable box measure: median coefficient of variation 0.076, against 0.117 for box height and 0.151 for box width.
+- All four torso joints are visible in a median of only 36% of frames per video. A body-centred reference would often depend on invisible ground-truth coordinates, which are unreliable (Section 5.5.1).
+
+#### 9.4.2 Bounding boxes as supplied oracle information
+
+Ground-truth bounding boxes are **supplied oracle information** in this study's design (Section 5.2). At test time, each test video is normalised using **that test video's own ground-truth boxes**. This uses the same box information that is already given to the pose estimator in C2, C3 and C5. It does **not** fit any model parameters, and it does **not** use action labels, other test videos or test results. As with box-based cropping, this makes the setting optimistic relative to a fully automatic pipeline (Section 12).
+
+#### 9.4.3 Processing order **[PROPOSED]**
+
+The proposed order of preprocessing steps is listed below. Where a step depends on an open decision, its content, and if necessary its position, will be confirmed when that decision is made.
+
+1. **Joint mapping** to the 12-joint primary representation (`D-09`, `D-11`).
+2. **Unreliable coordinates:** invisible ground-truth coordinates (`D-07b`, open; ground-truth poses only) and RTMPose invalid keypoints (`D-34`, open; estimated poses only). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions. How either is handled is not decided here.
+3. **Corruption** (C4 and C5 only; `D-14`–`D-18`, open).
+4. **Per-video normalisation** (`D-12`, this section).
+5. **Temporal preprocessing** (`D-20`, open). Corruption is placed before this step because any temporally correlated error model (`D-15`) is defined at the original frame rate.
+6. **Feature construction and any data-fitted standardisation** (`D-19`, open; Section 4.4, Stage B, item 9).
+
+**Corruption and normalisation.** The normalisation is a per-video translation plus a uniform scaling. If a corruption residual `e` is expressed in units of the same per-video scale `s_v`, then adding `e · s_v` in pixel space before normalisation gives exactly the same result as adding `e` after it: `((p + e · s_v) − c_v) / s_v = (p − c_v) / s_v + e`. In that case the two steps can be applied in either order. **This equivalence holds only when corruption is expressed in compatible per-video scale units.** It does not hold in general, for example for residuals expressed in pixels or in a per-frame scale. Expressing residuals in units of `s_v` is a **proposal conditional on `D-06`**, which remains open. Until D-06 is decided, the order above applies as listed.
+
+#### 9.4.4 Pre-registered sensitivity analysis S1 (secondary)
+
+- **Representation:** per-frame **hip-midpoint centring** with a **per-video body scale**.
+- **Computed from the pose actually supplied to the model:** ground truth in C1, estimated poses in C2, C3 and C5 testing, and corrupted ground truth in C4. A reference derived from ground truth is **never** applied to estimated poses, consistent with `D-07a` rule 4.
+- **Timing:** run only **after the primary analysis is complete**, with all primary settings frozen (no retuning). It is reported as a secondary analysis and does not replace the primary result.
+- **Purpose:** to test whether conclusions depend on the coordinate representation. Under S1, estimator error in the hip joints also shifts the reference point, so differences between S1 and the primary result are themselves informative.
+- **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with the eventual `D-07b` and `D-34` decisions.
 
 ---
 
@@ -556,6 +608,7 @@ For C4, corruption-draw variability (Section 7.4) is a third source. It is repor
 
 - Per-class performance (per-class F1, confusion matrices) for each condition.
 - Pose-estimation error by joint for the 12 primary joints (Section 5.4). During design this is computed on the fitting subset; the test partition is analysed only after all design decisions are frozen.
+- Normalisation sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, run only after the primary analysis with primary settings frozen (Section 9.4.4, `D-12`).
 
 **[PROPOSED]** Exploratory analyses that are labelled as such:
 
@@ -624,7 +677,8 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 **Internal validity**
 
-- **Ground-truth bounding-box crops** remove detection error, so the results likely underestimate the degradation that a fully automatic pipeline would show.
+- **Ground-truth bounding-box crops** remove detection error, so the results likely underestimate the degradation that a fully automatic pipeline would show. The same oracle boxes are also used for pose normalisation (Section 9.4.2), so the recognisers never face errors in person localisation or scale.
+- **Camera motion in normalised coordinates:** per-video normalisation preserves within-video movement, but it cannot separate subject movement from camera panning. Camera motion therefore remains in the inputs. It is identical across conditions for a given video (Section 9.4).
 - **Model selection on C1 only:** hyperparameters and training duration chosen on clean ground-truth data may not suit C3 and C5. Their primary-experiment performance may therefore understate what condition-specific tuning could achieve. The optional secondary analysis (Section 4.4) addresses this.
 - **Ground-truth annotation noise:** Penn Action annotations are themselves imperfect, so "error" is measured relative to a noisy reference.
 - **Invisible joints** have unreliable ground-truth coordinates: many are edge-clamped or frozen (Section 5.5.1). They are excluded from error measurement and corruption fitting (`D-07a`). As a result, estimator accuracy on occluded or out-of-frame joints is not measured against ground truth, and the corruption model is fitted only on visible joints. Their treatment in recogniser inputs (`D-07b`) may affect ground-truth versus estimated-pose comparisons.
@@ -671,6 +725,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-12 *(v0.7)* | Pose normalisation and ordering | **Per-video bounding-box normalisation:** `(joint − c_v) / s_v`, where `c_v` is the median centre and `s_v` the median diagonal of that video's **valid** ground-truth boxes, with the same scale for x and y. The transform depends only on boxes, so it is identical for a given video in C1–C5. Within-video movement is preserved: no per-frame recentring or rescaling, rotation alignment or mirroring. Boxes are supplied oracle information; test videos are normalised with their own ground-truth boxes, with no model parameters fitted and no labels used. Box validity and fallback rules remain under D-05. Proposed processing order recorded (Section 9.4.3), dependent on D-07b, D-34, D-14–D-18, D-20 and D-19. Corruption and normalisation are interchangeable in order **only** if residuals use compatible per-video scale units; expressing them in units of `s_v` is a proposal conditional on D-06. Pre-registered secondary sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, computed from the pose supplied to the model, run only after the primary analysis (Section 9.4). |
 | D-07a *(v0.6)* | Visibility semantics and use | Values are 0/1, and their meaning is not documented. *Inferred:* 0 includes occluded and out-of-frame joints, and invisible coordinates are unreliable (edge-clamped, frozen, distorted limb lengths). Rules: error measured on visible ground-truth joints only, excluding (0,0) placeholders, with frames lacking any valid visible joint reported as unscorable; corruption fitted on visible residuals from the fitting subset only; visibility flags never recogniser inputs; ground-truth visibility never applied to estimated poses (C2, C3, C5); test-set visibility used only for evaluation eligibility. Visibility-conditioned corruption remains under D-18 (Section 5.5). |
 | D-11 *(v0.5)* | Joint column order | 1-based columns: 1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles. This is an **evidence-supported inference**, not a documented fact: the official website lists the 13 joints in this order, but no inspected source states that list position *k* is array column *k*. Evidence: agreement with the official list; geometry across all 1,258 training videos (leg chain strongly supported; elbow-versus-wrist weaker because arms bend); visual inspection of 10 overlays (29 frames), 3 independently reviewed by the researcher. Kept separate from D-09 (left/right). Limitations: paper not accessible; individual annotation errors possible; head-point meaning remains under D-08 (Section 6.5). |
 | D-09 *(v0.4)* | Left/right convention | Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the anatomical LEFT. Every left/right pair (shoulders, elbows, wrists, hips, knees, ankles) is swapped when mapping to COCO/RTMPose. Evidence: training-partition annotation statistics, plus visual inspection of 15 training videos (7 judgeable, all consistent; 3 independently confirmed by the researcher). RTMPose was not used for the decision. Limitation: verified on a sample, not every video. The original annotation files are unchanged; the swap is applied in project code (Sections 6.2, 6.4). |
@@ -688,11 +743,10 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-02 | Validation split | Stratification and rounding rule; random seed; file format for storing video identifier lists. |
 | D-03 | RTMPose variant | Model size, its training data, input resolution, and checkpoint name and checksum. |
 | D-04 | Inference implementation | Software stack and version for running RTMPose; dependency pinning in `requirements.txt`. |
-| D-05 | Cropping | Bounding-box padding, aspect-ratio handling, and frames with missing or degenerate boxes. |
-| D-06 | Error normalisation and PCK | Coordinate frame and reference scale for residuals and error metrics; PCK reference scale *s* and threshold fraction(s) *α*. |
-| D-07b | Invisible ground-truth coordinates in recogniser inputs | Choose between Option A (retain the coordinates as released, handling (0,0) placeholders appropriately) and Option C (reconstruct invisible coordinates with a defined within-video interpolation and fallback policy). Decide together with D-12 and D-20, before any test-set evaluation. The rule must be consistent across conditions. Concerns Penn Action ground-truth coordinates only; RTMPose invalid keypoints are the separate question D-34 (Section 5.5.3). |
+| D-05 | Cropping | Bounding-box padding, aspect-ratio handling, and frames with missing or degenerate boxes. Also defines which boxes count as **valid** for the D-12 normalisation, and the fallback for a video with no valid box (Section 9.4.1). |
+| D-06 | Error normalisation and PCK | Coordinate frame and reference scale for residuals and error metrics; PCK reference scale *s* and threshold fraction(s) *α*. Proposal under consideration (v0.7): express corruption residuals in units of the per-video box diagonal `s_v` used by D-12 (Sections 8.2, 9.4.3). Not decided. |
+| D-07b | Invisible ground-truth coordinates in recogniser inputs | Choose between Option A (retain the coordinates as released, handling (0,0) placeholders appropriately) and Option C (reconstruct invisible coordinates with a defined within-video interpolation and fallback policy). Decide together with D-20, consistently with D-12 (resolved, v0.7), before any test-set evaluation. The rule must be consistent across conditions. Concerns Penn Action ground-truth coordinates only; RTMPose invalid keypoints are the separate question D-34 (Section 5.5.3). |
 | D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
-| D-12 | Normalisation and ordering | Pose normalisation method, and the order of the normalisation and corruption steps. |
 | D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). |
 | D-15 | Corruption distribution | The family of error models: independent, correlated, temporal, with outliers or swaps. |
 | D-16 | Severity levels | The number of severity levels and how each is defined. |
