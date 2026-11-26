@@ -1,7 +1,7 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.5 for review. Not final.
+**Document status:** Draft v0.6 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
 
@@ -14,6 +14,7 @@
 | v0.3 | 2026-11-20 | Resolved D-33. After selection on C1 validation and freezing of all settings, final models are reinitialised and trained from scratch on the full official training partition (1,258 videos), with the frozen epoch count and no validation-based early stopping. The corruption model remains derived from the fitting subset only. Sections 4.1, 4.4, 4.5, 7.1–7.4, 8.1, 9.2, 9.3, 11.2, 12 and 14 updated accordingly. No other methodological decisions changed. **v0.3 amendments after internal review (same date):** §4.3 design-stage pose-error analysis restricted to the fitting subset (previously "training partition"); §4.4 Stage B adds that data-fitted preprocessing is refitted on the full official training partition and never on the test partition, with methods still open under D-12 (later Stage B items renumbered); §11.2 Stage A log label corrected to "fitting + validation subsets"; §12 limitation widened from the epoch count to all frozen hyperparameters. No decisions resolved or changed. |
 | v0.4 | 2026-11-26 | Resolved D-09 (left/right convention). Inspection of Penn Action training annotations and frames showed that columns labelled LEFT hold the subject's anatomical RIGHT, and vice versa. The Penn Action → COCO mapping therefore swaps every left/right pair (Sections 6.2, 6.4, 14). The original annotation files are unchanged; the swap belongs in project mapping code. Project-status line updated (dataset now stored locally). No other methodological decisions changed; D-11 remains open. |
 | v0.5 | 2026-11-26 | Resolved D-11 (joint column order). The 13-column order (1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles, 1-based) is recorded as an evidence-supported inference. It is not an explicitly documented fact: no inspected source states that list position *k* corresponds to array column *k*. New Section 6.5; Sections 6.2 and 14 updated. D-09 (left/right) is unchanged and kept separate. No other methodological decisions changed. |
+| v0.6 | 2026-11-26 | D-07 split into D-07a (resolved) and D-07b (open). D-07a records the visibility semantics: 0/1 values, meaning not documented; inferred to cover occluded and out-of-frame joints; invisible coordinates unreliable. It also sets the rules for error measurement (visible ground truth only), corruption fitting (visible residuals from the fitting subset only), recogniser inputs (no visibility flags; ground-truth visibility never applied to estimated poses) and test-set use (joint eligibility for evaluation only). D-07b keeps open how invisible ground-truth coordinates enter recogniser inputs (Option A or C), to be decided with D-12 and D-20. New open item D-34: how RTMPose invalid keypoints (score ≤ 0) are handled in recogniser inputs; linked to D-07b but separate from its Option A/C choice, and undecided. D-18 remains open. Sections 5.4, 5.5, 8.2, 9.3, 12 and 14 updated. No other methodological decisions changed. |
 
 ---
 
@@ -201,19 +202,70 @@ After mapping to the **12-joint primary representation** (Section 6), per-joint 
 
 **PCK definition.** PCK counts a predicted joint as correct when its distance from ground truth is below a threshold *α × s*, where *s* is a stated **reference scale** and *α* is a stated **threshold fraction**. A PCK value has no meaning without both. No result will be labelled in a form such as "PCK@0.2" unless the reference scale is stated with it, for example "PCK@0.2 of the bounding-box diagonal". The reference scale and threshold(s) remain open under `D-06`.
 
-Which ground-truth joints are valid for error measurement depends on the visibility semantics of the annotations (Section 5.5, `D-07`).
+Only **visible** ground-truth joints are valid for error measurement. (0,0) placeholders are excluded, and frames with no valid visible ground-truth joint are unscorable (Section 5.5, `D-07a`).
 
 Head-joint error is outside the primary analysis and may be reported only in the exploratory analysis described in Section 6.3.
 
-### 5.5 Visibility and missing joints **[OPEN]**
+### 5.5 Visibility and missing joints
 
-Penn Action provides a per-joint visibility flag. It is **not** assumed that every joint flagged as invisible should simply be discarded from every part of the study. For example, an occluded joint may still carry an annotated position of useful but lower reliability. Before deciding, the annotation format and the exact meaning of the visibility flag (and of any coordinate placeholders) will be inspected on the downloaded data. The following questions will then be decided separately (`D-07`):
+Penn Action provides a per-joint visibility flag. Its handling was investigated on the downloaded annotations and is split into two decisions:
+- `D-07a` covers the semantics, error measurement, corruption fitting, the use of visibility as an input, and test-set use. **[ESTABLISHED, v0.6]**
+- `D-07b` covers how invisible ground-truth coordinates enter recogniser inputs. **[OPEN]**
 
-1. which joints are valid for **pose-error measurement** (Section 5.4);
-2. which observations are used to **fit corruption distributions** (Section 8);
-3. how missing or invisible coordinates are **represented in recogniser inputs** (Section 9).
+**[ESTABLISHED]** All rules are applied **consistently across all conditions**, and are recorded before any test-set evaluation.
 
-**[ESTABLISHED]** Whatever rules are adopted, they are applied **consistently across all conditions**, and recorded before any test-set evaluation.
+#### 5.5.1 What is known about visibility
+
+**Documented facts.**
+- The visibility array holds **0/1 values**, one per joint per frame (`[frames × 13]`, logical).
+- The official website and README describe the annotations only as "2D locations and visibility". **No source defines what 0 and 1 mean.**
+- The supplied MATLAB tool (`CreatePointLightDisplay.m`) simply omits joints with visibility 0 from its display.
+- The annotation tool used to build the dataset (VATIC-ACTION) documents separate *lost* (outside the view), *occluded* and *generated* (automatically interpolated) flags in its own export format. How these became Penn Action's single flag is not documented.
+- The original ICCV 2013 paper could not be accessed during this investigation.
+
+**Empirical findings** (training partition only, `train = 1`: 1,258 videos, 87,543 frames; 78.1% of joint observations visible):
+- *Self-occlusion pattern:* in side views, the far side of the body is much less often visible. Visibility of the even versus odd 1-based columns (see `D-09`) is:
+  - `pose = left`: 0.604 versus 0.867;
+  - `pose = right`: 0.848 versus 0.664;
+  - front views: a difference of only 0.04.
+- *Out-of-frame pattern:*
+  - 36.4% of invisible joints lie within 5 px of the frame edge, against 0.07% of visible joints. All invisible coordinates lie inside the frame.
+  - Joints typically out of shot are mostly invisible (for example, strum_guitar ankles are 3% visible).
+  - Separately, 539 of 889,216 visible joints lie outside the frame, so the flag is not a clean in-frame indicator.
+- *Frozen positions:* 65.6% of consecutive invisible coordinates are exactly repeated from one frame to the next (median movement 0.00 px). The figure for visible coordinates is 25.7% (median 1.33 px).
+- *Distorted limb lengths* (median, distal joint invisible versus visible):
+  - elbow→wrist 34.8–41.0 px versus 27.7–28.9 px;
+  - hip→knee 53.1–55.2 px versus 46.0–46.8 px;
+  - knee→ankle 232.7–288.9 px versus 43.0 px.
+- *Placeholders:* 13 invisible joints at exactly (0,0), all in one frame of training video 2173. 87 training frames have all 13 joints invisible.
+- *Stability:* 61.3% of joint tracks never change visibility; invisible stretches have a median length of 13 frames.
+- *Consistency:* visibility rates vary strongly by action, but the training and test partitions match overall (0.781 versus 0.778). The test partition was used only for this descriptive comparison.
+
+**Evidence-supported inferences** (not documented facts):
+- Visibility 0 **includes both occluded and out-of-frame joints**.
+- **Coordinates stored for invisible joints are unreliable.** Many are edge-clamped or frozen, and they give distorted limb lengths, so they cannot be treated as true joint positions.
+- No evidence was found either way on whether visibility encodes annotator confidence.
+
+#### 5.5.2 D-07a: rules **[ESTABLISHED, v0.6]**
+
+1. **Pose-estimation error** (Section 5.4) is calculated only on **visible** ground-truth joints. (0,0) placeholders are excluded. Frames with no valid visible ground-truth joint are **unscorable** and are reported as such (counted, not silently dropped).
+2. **Corruption distributions for C4/C5** (Section 8) are fitted only on residuals at **visible** ground-truth joints in the **fitting subset**.
+3. **Visibility flags are never recogniser inputs** in any condition. They exist only for ground-truth poses, so they would make inputs unequal between conditions. They are also strongly action-specific, and could act as a shortcut unrelated to body motion.
+4. **Ground-truth visibility is never applied to estimated poses** in C2, C3 or C5, whether as a mask, an imputation rule or any other preprocessing information.
+5. **Visibility-conditioned corruption** remains open under `D-18`.
+6. **Test-set visibility** may be used only to decide which ground-truth joints are **eligible for evaluation**. It must not be used for model fitting, preprocessing decisions or hyperparameter selection.
+
+#### 5.5.3 D-07b: invisible ground-truth coordinates in recogniser inputs **[OPEN]**
+
+How invisible ground-truth coordinates enter recogniser inputs remains undecided between:
+- **Option A:** retain the coordinates as released, with (0,0) placeholders handled appropriately.
+- **Option C:** reconstruct invisible coordinates using a defined within-video interpolation and fallback policy.
+
+**Why it matters.** Invisible ground-truth coordinates contain annotation artefacts (Section 5.5.1) that a recogniser could learn in ground-truth conditions, but that do not occur in estimated poses. The choice may therefore affect comparisons such as C1 versus C2.
+
+This decision must be made together with `D-12` (normalisation) and `D-20` (temporal preprocessing), and before any test-set evaluation.
+
+**Related but separate: RTMPose invalid keypoints (`D-34`, open).** RTMPose sets the location of any keypoint with score ≤ 0 to −1 before converting it to image coordinates (see `docs/POSE_ESTIMATION_SETUP.md`, Section 4). How such keypoints are handled in recogniser inputs is a **separate unresolved preprocessing question**. It is linked to D-07b, because both concern unreliable coordinates in recogniser inputs, but it is **not** part of the Option A/C choice above. No decision on it has been made.
 
 ---
 
@@ -398,7 +450,7 @@ For each severity level, C4 uses **multiple fixed corruption draws**, each gener
 ### 8.2 Proposed procedure **[PROPOSED]**
 
 1. Run RTMPose on the **fitting subset** and map the output to the 12-joint primary representation (Sections 5–6).
-2. Compute residuals (estimated minus ground truth) per joint and per frame, in a normalised coordinate frame (`D-06`). Which observations are eligible is decided under `D-07` (Section 5.5).
+2. Compute residuals (estimated minus ground truth) per joint and per frame, in a normalised coordinate frame (`D-06`). Only residuals at **visible** ground-truth joints in the fitting subset are eligible. (0,0) placeholders are excluded (`D-07a`, Section 5.5).
 3. Fit or summarise an error model from these residuals. Candidates are listed in `D-15`:
    - independent per-joint Gaussian or empirical distributions;
    - per-joint models that account for direction and correlation between the x and y coordinates;
@@ -448,7 +500,8 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 - Hyperparameter search spaces, search method (such as grid or random search) and budget, all applied on C1 validation (`D-22`).
 - Temporal preprocessing for sequences of different lengths: resampling to a fixed length, padding or cropping (`D-20`).
 - Pose normalisation: for example centring on the hip midpoint and scaling by torso length or box size (`D-12`).
-- Representation of missing or invisible joints in model input (`D-07`).
+- Representation of invisible ground-truth joints in model input (`D-07b`, Section 5.5.3). Visibility flags are never inputs, and ground-truth visibility is never applied to estimated poses (`D-07a`).
+- Representation of RTMPose keypoints with score ≤ 0 in model input (`D-34`, Section 5.5.3).
 - Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`).
 - Class-imbalance handling, such as class weighting (`D-24`).
 
@@ -574,7 +627,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 - **Ground-truth bounding-box crops** remove detection error, so the results likely underestimate the degradation that a fully automatic pipeline would show.
 - **Model selection on C1 only:** hyperparameters and training duration chosen on clean ground-truth data may not suit C3 and C5. Their primary-experiment performance may therefore understate what condition-specific tuning could achieve. The optional secondary analysis (Section 4.4) addresses this.
 - **Ground-truth annotation noise:** Penn Action annotations are themselves imperfect, so "error" is measured relative to a noisy reference.
-- **Invisible or occluded joints** may have unreliable ground-truth positions, which affects error measurement, corruption fitting and recogniser inputs (Section 5.5).
+- **Invisible joints** have unreliable ground-truth coordinates: many are edge-clamped or frozen (Section 5.5.1). They are excluded from error measurement and corruption fitting (`D-07a`). As a result, estimator accuracy on occluded or out-of-frame joints is not measured against ground truth, and the corruption model is fitted only on visible joints. Their treatment in recogniser inputs (`D-07b`) may affect ground-truth versus estimated-pose comparisons.
 - **Synthetic corruption fidelity:** the corruption model may not capture all properties of real estimator errors, such as temporal correlation, structured failures or left/right swaps. This limits how far C4 results generalise.
 - **Frozen hyperparameters transferred to a larger training set:** all hyperparameters, including the epoch count for the temporal CNN, are selected while training on ~85% of the training partition, then reused when refitting on 100%. The optimal values on the larger set may differ slightly. For example, the effective strength of regularisation can depend on the number of training samples, and the best training duration may change. No validation check is possible during refitting. This applies equally to all conditions.
 - **Smaller corruption-fitting sample:** using the fitting subset only (~85% of training videos) gives slightly less data for estimating the error model, which is accepted in exchange for strict data separation.
@@ -618,6 +671,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-07a *(v0.6)* | Visibility semantics and use | Values are 0/1, and their meaning is not documented. *Inferred:* 0 includes occluded and out-of-frame joints, and invisible coordinates are unreliable (edge-clamped, frozen, distorted limb lengths). Rules: error measured on visible ground-truth joints only, excluding (0,0) placeholders, with frames lacking any valid visible joint reported as unscorable; corruption fitted on visible residuals from the fitting subset only; visibility flags never recogniser inputs; ground-truth visibility never applied to estimated poses (C2, C3, C5); test-set visibility used only for evaluation eligibility. Visibility-conditioned corruption remains under D-18 (Section 5.5). |
 | D-11 *(v0.5)* | Joint column order | 1-based columns: 1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles. This is an **evidence-supported inference**, not a documented fact: the official website lists the 13 joints in this order, but no inspected source states that list position *k* is array column *k*. Evidence: agreement with the official list; geometry across all 1,258 training videos (leg chain strongly supported; elbow-versus-wrist weaker because arms bend); visual inspection of 10 overlays (29 frames), 3 independently reviewed by the researcher. Kept separate from D-09 (left/right). Limitations: paper not accessible; individual annotation errors possible; head-point meaning remains under D-08 (Section 6.5). |
 | D-09 *(v0.4)* | Left/right convention | Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the anatomical LEFT. Every left/right pair (shoulders, elbows, wrists, hips, knees, ankles) is swapped when mapping to COCO/RTMPose. Evidence: training-partition annotation statistics, plus visual inspection of 15 training videos (7 judgeable, all consistent; 3 independently confirmed by the researcher). RTMPose was not used for the decision. Limitation: verified on a sample, not every video. The original annotation files are unchanged; the swap is applied in project code (Sections 6.2, 6.4). |
 | D-33 *(v0.3)* | Final refit | Final models are **reinitialised and trained from scratch on the full official training partition** (fitting plus validation, 1,258 videos) after all Stage A selection decisions are frozen. The temporal CNN reuses the frozen epoch count, without validation-based early stopping. C1, C2 and C4 share one final model per seed; C3 and C5 are trained on the full partition with their own pose sources. The corruption model remains derived from the fitting subset only (Section 4.4, Stage B). |
@@ -636,7 +690,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-04 | Inference implementation | Software stack and version for running RTMPose; dependency pinning in `requirements.txt`. |
 | D-05 | Cropping | Bounding-box padding, aspect-ratio handling, and frames with missing or degenerate boxes. |
 | D-06 | Error normalisation and PCK | Coordinate frame and reference scale for residuals and error metrics; PCK reference scale *s* and threshold fraction(s) *α*. |
-| D-07 | Visibility and missing joints | After inspecting the annotation format and visibility semantics: the joints valid for error measurement, the observations used for corruption fitting, and the representation of missing or invisible joints in recogniser inputs. Treatment must be consistent across conditions. |
+| D-07b | Invisible ground-truth coordinates in recogniser inputs | Choose between Option A (retain the coordinates as released, handling (0,0) placeholders appropriately) and Option C (reconstruct invisible coordinates with a defined within-video interpolation and fallback policy). Decide together with D-12 and D-20, before any test-set evaluation. The rule must be consistent across conditions. Concerns Penn Action ground-truth coordinates only; RTMPose invalid keypoints are the separate question D-34 (Section 5.5.3). |
 | D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
 | D-12 | Normalisation and ordering | Pose normalisation method, and the order of the normalisation and corruption steps. |
 | D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). |
@@ -657,6 +711,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-30 | Estimator licensing | Record the RTMPose/MMPose code and weight licences. |
 | D-31 | Repository licence | Choose a licence for this repository's code. |
 | D-32 | Figures | Whether dataset frames may appear in published figures. |
+| D-34 | RTMPose invalid keypoints in recogniser inputs | How RTMPose keypoints with score ≤ 0 (location set to −1 before rescaling) are represented in recogniser inputs. This is a separate preprocessing question, linked to D-07b but not part of its Option A/C choice. Undecided (Section 5.5.3). |
 
 ---
 

@@ -84,7 +84,7 @@ proposed_freeze:
   cudnn_allow_tf32: false          # strict FP32; removes hardware-dependent rounding at SimCC bin boundaries
   cpu_crosscheck_sample: true      # compare a sample of frames on CPU
   store_all_17_keypoints: true     # map to 12 joints later, in the main environment
-  invalid_keypoints: keep_raw_and_flag_score_le_0   # final treatment depends on protocol D-07
+  invalid_keypoints: keep_raw_and_flag_score_le_0   # final treatment open under protocol D-34 (linked to D-07b)
   open_items:
     - Penn Action box format and semantics (verify after download; D-05, D-01)
     - boxes partly outside the frame, degenerate boxes, frames without a box (D-05)
