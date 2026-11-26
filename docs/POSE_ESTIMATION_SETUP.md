@@ -160,7 +160,9 @@ The model outputs the **17 COCO keypoints** in this order [EXECUTED]: 0 nose, 1 
 
 The primary research analysis uses **12 joints** (shoulders, elbows, wrists, hips, knees, ankles), as defined in `RESEARCH_PROTOCOL.md` §6. That 17-to-12 mapping is a **separate component that is not yet implemented**.
 
-The left/right convention (D-09) and Penn Action joint ordering (D-11) are also **not yet verified**. On the single test photograph, where the subject faces the camera, the model's `left_wrist` appeared on the image's right side. That is consistent with an anatomical left/right convention, but one image is not verification.
+**Left/right convention (D-09): resolved in protocol v0.4.** Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, so every left/right pair is **swapped** when mapping Penn Action to these COCO keypoints. The evidence and limitations are in `RESEARCH_PROTOCOL.md` §6.4. The decision rests on Penn Action annotations and frames, not on RTMPose output. RTMPose's own side convention is *assumed* to be anatomical. That assumption is consistent with one test photograph, where the subject faces the camera and the model's `left_wrist` appeared on the image's right side, but it has not been verified beyond that.
+
+The Penn Action joint ordering (D-11) remains **not yet formally verified**.
 
 ## 7. Licensing (unresolved)
 

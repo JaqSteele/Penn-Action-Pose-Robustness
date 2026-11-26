@@ -1,9 +1,9 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.3 for review. Not final.
-**Date of this revision:** 2026-11-20 (v0.1 drafted 2026-11-18)
-**Project status at time of writing:** Environment and repository set up. No data has been downloaded, no poses have been estimated, and no experiments have been run. This document contains **no experimental results**.
+**Document status:** Draft v0.4 for review. Not final.
+**Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
+**Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
 
 ### Revision history
 
@@ -12,6 +12,7 @@
 | v0.1 | 2026-11-18 | First draft. |
 | v0.2 | 2026-11-20 | Targeted revision following independent methodological review. Changes: a primary model-selection strategy (C1 validation, hyperparameters frozen across conditions); a 12-joint primary representation with the head excluded; corruption residuals restricted to the fitting subset; confidence scores excluded from recogniser inputs; visibility handling clarified; repeated C4 corruption draws favoured; paired bootstrap procedure specified; H6 framed as exploratory; PCK definition clarified. The research question, scope and conditions C1–C5 are unchanged. |
 | v0.3 | 2026-11-20 | Resolved D-33. After selection on C1 validation and freezing of all settings, final models are reinitialised and trained from scratch on the full official training partition (1,258 videos), with the frozen epoch count and no validation-based early stopping. The corruption model remains derived from the fitting subset only. Sections 4.1, 4.4, 4.5, 7.1–7.4, 8.1, 9.2, 9.3, 11.2, 12 and 14 updated accordingly. No other methodological decisions changed. **v0.3 amendments after internal review (same date):** §4.3 design-stage pose-error analysis restricted to the fitting subset (previously "training partition"); §4.4 Stage B adds that data-fitted preprocessing is refitted on the full official training partition and never on the test partition, with methods still open under D-12 (later Stage B items renumbered); §11.2 Stage A log label corrected to "fitting + validation subsets"; §12 limitation widened from the epoch count to all frozen hyperparameters. No decisions resolved or changed. |
+| v0.4 | 2026-11-26 | Resolved D-09 (left/right convention). Inspection of Penn Action training annotations and frames showed that columns labelled LEFT hold the subject's anatomical RIGHT, and vice versa. The Penn Action → COCO mapping therefore swaps every left/right pair (Sections 6.2, 6.4, 14). The original annotation files are unchanged; the swap belongs in project mapping code. Project-status line updated (dataset now stored locally). No other methodological decisions changed; D-11 remains open. |
 
 ---
 
@@ -227,23 +228,27 @@ RTMPose outputs 17 COCO keypoints, and Penn Action annotates 13 joints. All cond
 
 ### 6.2 Mapping table
 
-Penn Action joint indices below follow the dataset's documented ordering (1-based). The ordering **must be verified** against the downloaded annotation files (`D-11`).
+Penn Action joint indices below follow the dataset's documented ordering (1-based); the 0-based column is the corresponding column of the `x`/`y`/`visibility` arrays. The column order is consistent with the annotations, but it has not yet been formally verified (`D-11`, open).
 
-| Penn Action joint (index) | COCO keypoint (0-based index) | Status |
-|---|---|---|
-| Head (1) | None assumed | **Excluded from primary representation [ESTABLISHED].** Exploratory only (`D-08`) |
-| Left shoulder (2) | Left shoulder (5) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right shoulder (3) | Right shoulder (6) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Left elbow (4) | Left elbow (7) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right elbow (5) | Right elbow (8) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Left wrist (6) | Left wrist (9) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right wrist (7) | Right wrist (10) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Left hip (8) | Left hip (11) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right hip (9) | Right hip (12) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Left knee (10) | Left knee (13) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right knee (11) | Right knee (14) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Left ankle (12) | Left ankle (15) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
-| Right ankle (13) | Right ankle (16) | Primary; direct correspondence **[PROPOSED]**, subject to `D-09` |
+**Left/right is swapped [ESTABLISHED, v0.4].** Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the subject's anatomical LEFT (`D-09`, Section 6.4). Each Penn Action joint is therefore mapped to the COCO keypoint for the **opposite-named** side. COCO keypoints are taken to use the subject's anatomical left/right (see the assumption in Section 6.4).
+
+| Penn Action label (1-based index) | Penn column (0-based) | Subject's anatomical side (D-09) | COCO keypoint (0-based index) | Status |
+|---|---|---|---|---|
+| Head (1) | 0 | — | None assumed | **Excluded from primary representation [ESTABLISHED].** Exploratory only (`D-08`) |
+| Left shoulder (2) | 1 | Right | Right shoulder (6) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right shoulder (3) | 2 | Left | Left shoulder (5) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left elbow (4) | 3 | Right | Right elbow (8) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right elbow (5) | 4 | Left | Left elbow (7) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left wrist (6) | 5 | Right | Right wrist (10) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right wrist (7) | 6 | Left | Left wrist (9) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left hip (8) | 7 | Right | Right hip (12) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right hip (9) | 8 | Left | Left hip (11) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left knee (10) | 9 | Right | Right knee (14) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right knee (11) | 10 | Left | Left knee (13) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left ankle (12) | 11 | Right | Right ankle (16) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Right ankle (13) | 12 | Left | Left ankle (15) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+
+Throughout the project, the 12 primary joints are named by the subject's **anatomical** side, not by Penn Action's column labels. Code should define the mapping by explicit names and check those names against the estimator's keypoint metadata. The swap must be applied in project code. It must never be applied by editing the original annotation files.
 
 COCO keypoints not used in the primary representation: nose (0), left eye (1), right eye (2), left ear (3), right ear (4).
 
@@ -253,9 +258,39 @@ The Penn Action head annotation is **retained** in the stored data. The RTMPose/
 
 A separate **exploratory** head analysis will be carried out only if a defensible correspondence can be established using the **fitting subset only**. Candidate approaches to examine include a single facial keypoint, the mean of available facial keypoints, or a fitted offset from facial keypoints (`D-08`). If no defensible correspondence is found, the head analysis will not be performed, and the reason will be reported. No exploratory head result will alter the primary 12-joint experiment.
 
-### 6.4 Left/right convention **[OPEN]**
+### 6.4 Left/right convention **[ESTABLISHED, v0.4]** (`D-09`, resolved)
 
-It must be confirmed that both formats use the same left/right convention: the subject's anatomical left, rather than image left. A systematic left/right inversion would create large artificial errors (`D-09`).
+**Adopted convention.** Penn Action columns labelled LEFT correspond to the subject's anatomical RIGHT, and columns labelled RIGHT correspond to the subject's anatomical LEFT. When Penn Action joints are mapped to COCO/RTMPose keypoints, every left/right pair is swapped: shoulders, elbows, wrists, hips, knees and ankles (Section 6.2).
+
+**Rationale.** RTMPose outputs COCO keypoints, which follow the subject's anatomical left/right. Without the swap, every ground-truth joint would be paired with the estimator's prediction for the opposite side of the body. That would add a large, systematic, artificial error to every estimated-pose condition and to the corruption model fitted from those residuals. The swap makes ground truth and estimates refer to the same anatomical joint.
+
+**Evidence** (training partition only, `train = 1`; no test-partition videos were used). The dataset archive was obtained from the official URL and has SHA-256 `e3e41bd99deb7b3beb9785f78b209de272bb0fa60ff4432ffa88118907a797de`.
+
+1. *Annotation statistics.* Across training videos, the labels flip with the viewpoint label. Consider frames where both shoulders are visible, and ask whether the LEFT-labelled shoulder lies to the image right of the RIGHT-labelled shoulder:
+   - `pose = front`: 3.9% of 16,604 frames (5.4% of 295 videos by majority);
+   - `pose = back`: 82.1% of 11,930 frames (77.4% of 345 videos);
+   - actions with a stable viewpoint: bowl, pullup and squat give 0% for front and 100% for back.
+
+   This shows the labels follow the body, not the image side. On its own, it cannot show which anatomical side is meant.
+2. *Visual inspection.* Ground-truth overlays were made for 44 frames from 15 training videos (bowl, squat, pullup and jumping_jacks; front and back views). The videos were selected by joint visibility only. Facing direction was judgeable in 7 videos:
+   - front: 1037, 1739, 0543, 1157;
+   - back: 0536, 0496, 1192.
+
+   In **all 7**, the LEFT-labelled joints lie on the subject's anatomical **right**. Facing direction was judged inconclusive in 3 videos (1177, 1146, 1702), and those videos did not contradict the finding. The remaining 5 overlays (0542, 1741, 1167, 1038, 1735) were not individually assessed for facing direction.
+3. *Independent review.* The researcher independently reviewed the overlays for videos 1037 (front), 1739 (front) and 1192 (back) and reached the same conclusion.
+
+RTMPose predictions were **not** used to decide this convention.
+
+**Assumption.** COCO/RTMPose keypoints are taken to use the subject's anatomical left/right. The MMPose COCO metadata names the keypoints by side, with matching flip pairs. One RTMPose test image of a subject facing the camera placed `left_wrist` on the image's right, which is consistent with this assumption. COCO's annotation convention was not independently re-verified in this project.
+
+**Limitations.**
+- The convention was verified visually on a **sample** of training videos (7 judgeable videos from 4 actions), not on every video.
+- It assumes the convention is applied consistently across the whole dataset.
+- Actions where the body rotates during the movement (for example baseball pitch, golf swing, tennis serve) were not visually inspected.
+- Facing direction was judged by eye, at low resolution in some videos.
+- Individual annotation errors, where one video or frame has its sides swapped, would not be corrected by this global rule. Such errors would appear as ground-truth noise.
+
+**Data handling.** The original Penn Action annotation files are **unchanged**: all 2,326 `.mat` files were verified against SHA-256 checksums recorded before inspection. The dataset, frames and overlays are stored locally, outside the repository, and are not redistributed. The swap will be applied only by the project's mapping code, which is not yet implemented.
 
 ---
 
@@ -541,6 +576,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-09 *(v0.4)* | Left/right convention | Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the anatomical LEFT. Every left/right pair (shoulders, elbows, wrists, hips, knees, ankles) is swapped when mapping to COCO/RTMPose. Evidence: training-partition annotation statistics, plus visual inspection of 15 training videos (7 judgeable, all consistent; 3 independently confirmed by the researcher). RTMPose was not used for the decision. Limitation: verified on a sample, not every video. The original annotation files are unchanged; the swap is applied in project code (Sections 6.2, 6.4). |
 | D-33 *(v0.3)* | Final refit | Final models are **reinitialised and trained from scratch on the full official training partition** (fitting plus validation, 1,258 videos) after all Stage A selection decisions are frozen. The temporal CNN reuses the frozen epoch count, without validation-based early stopping. C1, C2 and C4 share one final model per seed; C3 and C5 are trained on the full partition with their own pose sources. The corruption model remains derived from the fitting subset only (Section 4.4, Stage B). |
 | D-10 *(v0.2)* | Residual source | Corruption model derived from the **fitting subset only**. Validation and test residuals are never used to estimate, calibrate or select it (Section 8.1). |
 | D-13 *(v0.2)* | Validation pose source in C3 and C5 | Primary model selection uses **C1 ground-truth validation only**, with settings frozen across conditions. C3 and C5 validation is descriptive monitoring only (Sections 4.4, 7.3). |
@@ -559,7 +595,6 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-06 | Error normalisation and PCK | Coordinate frame and reference scale for residuals and error metrics; PCK reference scale *s* and threshold fraction(s) *α*. |
 | D-07 | Visibility and missing joints | After inspecting the annotation format and visibility semantics: the joints valid for error measurement, the observations used for corruption fitting, and the representation of missing or invisible joints in recogniser inputs. Treatment must be consistent across conditions. |
 | D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
-| D-09 | Left/right convention | Verify that both formats use the same anatomical left/right convention. |
 | D-11 | Joint ordering | Verify Penn Action's joint index ordering against the downloaded annotations. |
 | D-12 | Normalisation and ordering | Pose normalisation method, and the order of the normalisation and corruption steps. |
 | D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). |
