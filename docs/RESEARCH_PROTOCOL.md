@@ -1,7 +1,7 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.4 for review. Not final.
+**Document status:** Draft v0.5 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
 
@@ -13,6 +13,7 @@
 | v0.2 | 2026-11-20 | Targeted revision following independent methodological review. Changes: a primary model-selection strategy (C1 validation, hyperparameters frozen across conditions); a 12-joint primary representation with the head excluded; corruption residuals restricted to the fitting subset; confidence scores excluded from recogniser inputs; visibility handling clarified; repeated C4 corruption draws favoured; paired bootstrap procedure specified; H6 framed as exploratory; PCK definition clarified. The research question, scope and conditions C1–C5 are unchanged. |
 | v0.3 | 2026-11-20 | Resolved D-33. After selection on C1 validation and freezing of all settings, final models are reinitialised and trained from scratch on the full official training partition (1,258 videos), with the frozen epoch count and no validation-based early stopping. The corruption model remains derived from the fitting subset only. Sections 4.1, 4.4, 4.5, 7.1–7.4, 8.1, 9.2, 9.3, 11.2, 12 and 14 updated accordingly. No other methodological decisions changed. **v0.3 amendments after internal review (same date):** §4.3 design-stage pose-error analysis restricted to the fitting subset (previously "training partition"); §4.4 Stage B adds that data-fitted preprocessing is refitted on the full official training partition and never on the test partition, with methods still open under D-12 (later Stage B items renumbered); §11.2 Stage A log label corrected to "fitting + validation subsets"; §12 limitation widened from the epoch count to all frozen hyperparameters. No decisions resolved or changed. |
 | v0.4 | 2026-11-26 | Resolved D-09 (left/right convention). Inspection of Penn Action training annotations and frames showed that columns labelled LEFT hold the subject's anatomical RIGHT, and vice versa. The Penn Action → COCO mapping therefore swaps every left/right pair (Sections 6.2, 6.4, 14). The original annotation files are unchanged; the swap belongs in project mapping code. Project-status line updated (dataset now stored locally). No other methodological decisions changed; D-11 remains open. |
+| v0.5 | 2026-11-26 | Resolved D-11 (joint column order). The 13-column order (1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles, 1-based) is recorded as an evidence-supported inference. It is not an explicitly documented fact: no inspected source states that list position *k* corresponds to array column *k*. New Section 6.5; Sections 6.2 and 14 updated. D-09 (left/right) is unchanged and kept separate. No other methodological decisions changed. |
 
 ---
 
@@ -228,25 +229,25 @@ RTMPose outputs 17 COCO keypoints, and Penn Action annotates 13 joints. All cond
 
 ### 6.2 Mapping table
 
-Penn Action joint indices below follow the dataset's documented ordering (1-based); the 0-based column is the corresponding column of the `x`/`y`/`visibility` arrays. The column order is consistent with the annotations, but it has not yet been formally verified (`D-11`, open).
+Penn Action joint indices below follow the official numbered joint list (1-based); the 0-based column is the corresponding column of the `x`/`y`/`visibility` arrays. **Column order is resolved (`D-11`, Section 6.5) as an evidence-supported inference.** No inspected source explicitly states that list position *k* is array column *k*.
 
 **Left/right is swapped [ESTABLISHED, v0.4].** Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the subject's anatomical LEFT (`D-09`, Section 6.4). Each Penn Action joint is therefore mapped to the COCO keypoint for the **opposite-named** side. COCO keypoints are taken to use the subject's anatomical left/right (see the assumption in Section 6.4).
 
 | Penn Action label (1-based index) | Penn column (0-based) | Subject's anatomical side (D-09) | COCO keypoint (0-based index) | Status |
 |---|---|---|---|---|
 | Head (1) | 0 | — | None assumed | **Excluded from primary representation [ESTABLISHED].** Exploratory only (`D-08`) |
-| Left shoulder (2) | 1 | Right | Right shoulder (6) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right shoulder (3) | 2 | Left | Left shoulder (5) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Left elbow (4) | 3 | Right | Right elbow (8) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right elbow (5) | 4 | Left | Left elbow (7) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Left wrist (6) | 5 | Right | Right wrist (10) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right wrist (7) | 6 | Left | Left wrist (9) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Left hip (8) | 7 | Right | Right hip (12) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right hip (9) | 8 | Left | Left hip (11) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Left knee (10) | 9 | Right | Right knee (14) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right knee (11) | 10 | Left | Left knee (13) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Left ankle (12) | 11 | Right | Right ankle (16) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
-| Right ankle (13) | 12 | Left | Left ankle (15) | Primary; swap **[ESTABLISHED]**; column order subject to `D-11` |
+| Left shoulder (2) | 1 | Right | Right shoulder (6) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right shoulder (3) | 2 | Left | Left shoulder (5) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Left elbow (4) | 3 | Right | Right elbow (8) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right elbow (5) | 4 | Left | Left elbow (7) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Left wrist (6) | 5 | Right | Right wrist (10) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right wrist (7) | 6 | Left | Left wrist (9) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Left hip (8) | 7 | Right | Right hip (12) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right hip (9) | 8 | Left | Left hip (11) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Left knee (10) | 9 | Right | Right knee (14) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right knee (11) | 10 | Left | Left knee (13) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Left ankle (12) | 11 | Right | Right ankle (16) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
+| Right ankle (13) | 12 | Left | Left ankle (15) | Primary; swap **[ESTABLISHED]** (`D-09`); column order **[ESTABLISHED, inferred]** (`D-11`) |
 
 Throughout the project, the 12 primary joints are named by the subject's **anatomical** side, not by Penn Action's column labels. Code should define the mapping by explicit names and check those names against the estimator's keypoint metadata. The swap must be applied in project code. It must never be applied by editing the original annotation files.
 
@@ -291,6 +292,47 @@ RTMPose predictions were **not** used to decide this convention.
 - Individual annotation errors, where one video or frame has its sides swapped, would not be corrected by this global rule. Such errors would appear as ground-truth noise.
 
 **Data handling.** The original Penn Action annotation files are **unchanged**: all 2,326 `.mat` files were verified against SHA-256 checksums recorded before inspection. The dataset, frames and overlays are stored locally, outside the repository, and are not redistributed. The swap will be applied only by the project's mapping code, which is not yet implemented.
+
+### 6.5 Joint column order **[ESTABLISHED, v0.5, inferred]** (`D-11`, resolved)
+
+**Adopted column order** (1-based column of the `x`, `y` and `visibility` arrays; the 0-based index is one less):
+
+| Columns (1-based) | Joint type |
+|---|---|
+| 1 | Head |
+| 2–3 | Shoulders |
+| 4–5 | Elbows |
+| 6–7 | Wrists |
+| 8–9 | Hips |
+| 10–11 | Knees |
+| 12–13 | Ankles |
+
+**Status of this mapping.** It is an **evidence-supported inference, not an explicitly documented fact**. The official dataset website gives a numbered list of 13 annotated joints in this order. The annotation arrays have 13 columns. But **no source inspected in this project explicitly states that list position *k* corresponds to array column *k***. The sources inspected were:
+- the official website;
+- the archive's README;
+- the supplied MATLAB tools (`visualize.m`, `CreatePointLightDisplay.m`, which treat all 13 columns identically);
+- the website's `Keypoints.png` figure (point-light displays, not a numbered joint diagram).
+
+**Supporting evidence** (training partition only, `train = 1`, 1,258 videos; no test-partition videos were used):
+1. *Agreement with the official numbered joint list* for every column.
+2. *Training-set annotation geometry*, testing body positions without using the LEFT/RIGHT names. "Upright actions" excludes bench_press, pushup and situp.
+   - *Vertical order in upright actions:* column 1 above shoulder columns 2/3 in 99.0%/98.7% of frames; shoulders (2, 3) above hips (8, 9) in 99.8%/99.9%; hips above knees (10, 11) in 99.1%/98.0%; knees above ankles (12, 13) in 97.2%/98.9%.
+   - *Proximity along the limb:* knee columns (10/11) lie nearer the hips than ankle columns (12/13) in 98.3%/98.7% of frames. This makes the **leg-chain order strongly supported**. Elbow columns (4/5) lie nearer the shoulders than wrist columns (6/7) in only 68.8%/69.1%, because arms frequently bend (for example bench press, pull-ups, clean and jerk). So the **elbow-versus-wrist distinction is only weakly supported by geometry**, and rests mainly on evidence items 1 and 3.
+   - *Consistent pairing:* pairing even columns with even (2-4-6-8-10-12) and odd with odd (3-5-7-9-11-13) gives the shorter limb connections in 97.1–99.5% of frames across all five limb segments. Each pair is therefore ordered consistently, with the even columns forming one body side and the odd columns the other.
+3. *Visual inspection:* ground-truth overlays were made for 44 frames from 15 training videos (bowl, squat, pullup, jumping_jacks). Ten of these overlays (29 frames) were individually viewed. In all 10, each labelled joint lay on the corresponding body part and the limb chains were anatomically coherent. The researcher independently reviewed three of these overlays (videos 1037, 1739, 1192). The figure of seven judgeable videos reported in Section 6.4 refers to facing direction for D-09, not to joint placement.
+
+No inspected evidence contradicts this column order.
+
+**Relationship to D-09.** D-11 establishes **which type of joint** each column holds, and that each left/right pair is ordered consistently. D-09 (Section 6.4) separately establishes **which anatomical side** each group of paired columns represents: columns labelled LEFT, which are the even 1-based columns, hold the subject's anatomical RIGHT. The two decisions rest on different evidence and together give the complete mapping in Section 6.2. Neither decision's evidence is used to prove the other.
+
+**Limitations.**
+- The original ICCV 2013 paper could not be accessed during this investigation; the publisher's site refused automated access. Whether it contains a numbered joint diagram is unknown.
+- The column-to-joint correspondence is inferred, not stated by the dataset authors.
+- The elbow-versus-wrist distinction has weaker geometric support than the other joints.
+- Individual annotation errors, such as a mislabelled joint in a particular video or frame, are possible. They would act as ground-truth noise and are not ruled out by this dataset-level decision.
+- The precise anatomical meaning of the head point (for example head centre or top of head) is a separate question under `D-08` and is not resolved here.
+
+**Data handling.** As for D-09, the original annotation files are unchanged, and the analyses and overlays are stored locally, outside the repository.
 
 ---
 
@@ -576,6 +618,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-11 *(v0.5)* | Joint column order | 1-based columns: 1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles. This is an **evidence-supported inference**, not a documented fact: the official website lists the 13 joints in this order, but no inspected source states that list position *k* is array column *k*. Evidence: agreement with the official list; geometry across all 1,258 training videos (leg chain strongly supported; elbow-versus-wrist weaker because arms bend); visual inspection of 10 overlays (29 frames), 3 independently reviewed by the researcher. Kept separate from D-09 (left/right). Limitations: paper not accessible; individual annotation errors possible; head-point meaning remains under D-08 (Section 6.5). |
 | D-09 *(v0.4)* | Left/right convention | Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the anatomical LEFT. Every left/right pair (shoulders, elbows, wrists, hips, knees, ankles) is swapped when mapping to COCO/RTMPose. Evidence: training-partition annotation statistics, plus visual inspection of 15 training videos (7 judgeable, all consistent; 3 independently confirmed by the researcher). RTMPose was not used for the decision. Limitation: verified on a sample, not every video. The original annotation files are unchanged; the swap is applied in project code (Sections 6.2, 6.4). |
 | D-33 *(v0.3)* | Final refit | Final models are **reinitialised and trained from scratch on the full official training partition** (fitting plus validation, 1,258 videos) after all Stage A selection decisions are frozen. The temporal CNN reuses the frozen epoch count, without validation-based early stopping. C1, C2 and C4 share one final model per seed; C3 and C5 are trained on the full partition with their own pose sources. The corruption model remains derived from the fitting subset only (Section 4.4, Stage B). |
 | D-10 *(v0.2)* | Residual source | Corruption model derived from the **fitting subset only**. Validation and test residuals are never used to estimate, calibrate or select it (Section 8.1). |
@@ -595,7 +638,6 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-06 | Error normalisation and PCK | Coordinate frame and reference scale for residuals and error metrics; PCK reference scale *s* and threshold fraction(s) *α*. |
 | D-07 | Visibility and missing joints | After inspecting the annotation format and visibility semantics: the joints valid for error measurement, the observations used for corruption fitting, and the representation of missing or invisible joints in recogniser inputs. Treatment must be consistent across conditions. |
 | D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
-| D-11 | Joint ordering | Verify Penn Action's joint index ordering against the downloaded annotations. |
 | D-12 | Normalisation and ordering | Pose normalisation method, and the order of the normalisation and corruption steps. |
 | D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). |
 | D-15 | Corruption distribution | The family of error models: independent, correlated, temporal, with outliers or swaps. |

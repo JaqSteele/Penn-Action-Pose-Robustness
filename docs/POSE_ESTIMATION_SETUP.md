@@ -162,7 +162,7 @@ The primary research analysis uses **12 joints** (shoulders, elbows, wrists, hip
 
 **Left/right convention (D-09): resolved in protocol v0.4.** Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, so every left/right pair is **swapped** when mapping Penn Action to these COCO keypoints. The evidence and limitations are in `RESEARCH_PROTOCOL.md` §6.4. The decision rests on Penn Action annotations and frames, not on RTMPose output. RTMPose's own side convention is *assumed* to be anatomical. That assumption is consistent with one test photograph, where the subject faces the camera and the model's `left_wrist` appeared on the image's right side, but it has not been verified beyond that.
 
-The Penn Action joint ordering (D-11) remains **not yet formally verified**.
+**Joint column order (D-11): resolved in protocol v0.5.** Penn Action's 13 annotation columns are, 1-based: 1 head, 2–3 shoulders, 4–5 elbows, 6–7 wrists, 8–9 hips, 10–11 knees, 12–13 ankles. This is an evidence-supported inference, not a documented fact. The official site lists the joints in this order, but no inspected source states that list position *k* is array column *k*. The evidence, limitations and full mapping are in `RESEARCH_PROTOCOL.md` §6.5 and §6.2. D-11 (joint order) and D-09 (left/right) are separate decisions.
 
 ## 7. Licensing (unresolved)
 

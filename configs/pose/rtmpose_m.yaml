@@ -92,4 +92,4 @@ proposed_freeze:
 
 research_mapping:
   primary_joints: 12             # shoulders, elbows, wrists, hips, knees, ankles (RESEARCH_PROTOCOL.md section 6)
-  status: not_implemented        # separate component; left/right resolved (D-09, protocol v0.4 §6.4: Penn LEFT = anatomical RIGHT, swap every pair); ordering (D-11) not yet verified
+  status: not_implemented        # separate component; left/right resolved (D-09, protocol v0.4 §6.4: Penn LEFT = anatomical RIGHT, swap every pair); column order resolved (D-11, protocol v0.5 §6.5: 1 head, 2-3 shoulders, 4-5 elbows, 6-7 wrists, 8-9 hips, 10-11 knees, 12-13 ankles; evidence-supported inference)
