@@ -1,7 +1,7 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.9 for review. Not final.
+**Document status:** Draft v0.10 for review. Not final.
 **Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. No poses have been estimated and no experiments have been run. This document contains **no experimental results**.
 
@@ -18,6 +18,7 @@
 | v0.7 | 2026-11-26 | Resolved D-12 (pose-coordinate normalisation). Primary recogniser input: per-video bounding-box normalisation, `(joint − c_v) / s_v`, where `c_v` is the median centre and `s_v` the median diagonal of that video's valid ground-truth boxes, with the same scale for x and y. The transform depends only on boxes, so it is identical for a given video in C1–C5. Within-video movement is preserved: no per-frame recentring or rescaling, rotation alignment or mirroring. Bounding boxes are recorded as supplied oracle information. Pre-registered secondary sensitivity analysis S1 (per-frame hip-midpoint centring with a per-video body scale), run only after the primary analysis. Proposed processing order recorded, dependent on open decisions. D-05, D-06, D-07b, D-19, D-20 and D-34 remain open; the proposal to express corruption residuals in per-video box-diagonal units is conditional on D-06. New Section 9.4; Sections 4.4, 5.5.3, 7.2, 8.2, 9.3, 10.6, 12 and 14 updated. No other methodological decisions changed. |
 | v0.8 | 2026-11-26 | Resolved D-05 (ground-truth bounding boxes: validity, fallback and cropping). A box is valid if its row exists, its four values are finite and x2 > x1 and y2 > y1. Rows are aligned to frames from the first frame. D-12 medians use valid boxes only. Frames with an invalid box use the nearest valid box in the same video (ties: earlier frame); videos with no valid box use the full image. All frames and videos are retained. Invalid boxes are replaced before inference. Crop settings are those verified in the project's installed MMPose 1.3.2 inference pipeline (padding 1.25, then enlargement to the 3:4 input aspect ratio). Box provenance recorded as an evidence-supported inference, not a documented fact: the boxes appear to be the extent of the visible ground-truth joints, enlarged 1.2× and clipped to the image. Exact clipping boundaries uncertain. D-07a gains an explicit, documented D-05 exception to rule 4; its prohibition on direct use of ground-truth visibility flags or joint coordinates for estimated poses is unchanged. D-12 wording updated to acknowledge that its boxes carry inferred ground-truth pose information. New Sections 5.2.1–5.2.3; Sections 5.2, 5.5.2, 9.4.1, 9.4.2, 12 and 14 updated. No other methodological decisions changed. |
 | v0.9 | 2026-11-26 | Combined update. **D-05 amended:** a valid box also needs a diagonal of at least 0.05 × the actual image diagonal; only training video 1516 (placeholder box) is affected and now uses the existing full-image fallback. **D-02 resolved:** class-stratified 15% split (1,070 fitting / 188 validation) with a fully specified, seeded procedure and recorded list hashes. **D-07a evidence corrected** (rules unchanged in substance): placeholders are top-left corner points (x < 1 and y < 1, including (0,0)); other invisible coordinates are generally anatomically plausible but often frozen; the earlier edge-clamping and distorted-limb-length conclusions mainly reflected corner placeholders. **D-07b resolved:** Option A with coordinate-only placeholder handling. **D-06 split:** D-06a resolved (signed 2D residuals in units of `s_v`); D-06b (PCK threshold α) open. **D-18 resolved:** corruption is not conditioned on target visibility; the residual bank stores only measured residuals with an availability mask; gap handling and sequence sampling moved to D-15 (open). **D-34 narrowed** but still open: native rule and principles recorded; final handling awaits Penn Action inference. D-01, D-03, D-04, D-06b, D-15 and D-34 remain open. New Sections 4.1.1, 5.5.4, 8.2.1 and 8.2.2; Sections 4.1, 5.2.2, 5.4, 5.5, 8.2, 8.4, 9.3, 9.4.3, 9.4.4, 12 and 14 updated. No other methodological decisions changed. |
+| v0.10 | 2026-11-26 | **D-06b resolved:** primary PCK threshold α = 0.05 × `s_v`, supplementary α = 0.10 × `s_v`, PCK curve over α = 0–0.20 in steps of 0.01, and its normalised area under the curve (trapezoidal rule); study-defined choices justified by a training-partition scale analysis, not universal conventions. **D-15 split:** D-15a resolved (non-parametric resampling of measured, contiguous whole-pose residual sequences; G0 gap handling; no wrap-around; no source–target overlap; deterministic sampling and concatenation rules; logging); D-15b (numerical seeding scheme) open, to be decided with D-14. **D-34 split:** D-34a resolved (validity checks, preservation of raw output, exclusion from residuals, metric rules, same-joint temporal imputation); D-34b open (imputation steps 2–4, provisional pending measurement E1). The comparable-time-step assumption and the G0 under-corruption limitation are recorded. No experiment has been run. New Sections 5.4.1 and 8.2.3; Sections 5.4, 5.5, 5.5.4, 7.4, 8.2, 8.2.1, 8.2.2, 8.4, 9.3, 9.4.3, 9.4.4, 12 and 14 updated. No other methodological decisions changed. |
 
 ---
 
@@ -283,9 +284,31 @@ After mapping to the **12-joint primary representation** (Section 6), per-joint 
 - **[ESTABLISHED]** the Euclidean error in pixels, as descriptive supplementary information;
 - the Percentage of Correct Keypoints (PCK).
 
-**PCK definition.** PCK counts a predicted joint as correct when its distance from ground truth is below a threshold *α × s*, where *s* is a stated **reference scale** and *α* is a stated **threshold fraction**. A PCK value has no meaning without both. No result will be labelled in a form such as "PCK@0.2" unless the reference scale is stated with it. The reference scale is *s* = `s_v`, the per-video median box diagonal (`D-06a`). The threshold fraction(s) *α* remain open under `D-06b` and will be fixed before any test-set evaluation.
+**PCK definition.** PCK counts a predicted joint as correct when its distance from ground truth is below a threshold *α × s*, where *s* is a stated **reference scale** and *α* is a stated **threshold fraction**. A PCK value has no meaning without both. No result will be labelled in a form such as "PCK@0.2" unless the reference scale is stated with it. The reference scale is *s* = `s_v`, the per-video median box diagonal (`D-06a`).
 
-Only **visible** ground-truth joints are valid for error measurement. Corner placeholders (x < 1 and y < 1, including (0,0); Section 5.5.1) are excluded, and frames with no valid visible ground-truth joint are unscorable (Section 5.5, `D-07a`). How estimated keypoints with score ≤ 0 are treated in reported error metrics follows `D-34` (open).
+Only **visible** ground-truth joints are valid for error measurement. Corner placeholders (x < 1 and y < 1, including (0,0); Section 5.5.1) are excluded, and frames with no valid visible ground-truth joint are unscorable (Section 5.5, `D-07a`).
+
+#### 5.4.1 PCK thresholds and AUC (`D-06b`, resolved in v0.10) **[ESTABLISHED]**
+
+- **Primary threshold:** α = **0.05** (a joint is correct if its error is below 0.05 × `s_v`).
+- **Supplementary threshold:** α = **0.10**.
+- **PCK curve:** PCK evaluated at the 21 thresholds α<sub>i</sub> = 0.00, 0.01, …, 0.20.
+- **Normalised AUC:** the area under the PCK curve over the fixed interval [0, 0.20], computed with the trapezoidal rule on those 21 points and divided by the interval width 0.20:
+
+  AUC<sub>norm</sub> = (1 / 0.20) × Σ<sub>i=1..20</sub> 0.01 × (PCK(α<sub>i−1</sub>) + PCK(α<sub>i</sub>)) / 2
+
+  It ranges from 0 to 1. Because correctness requires an error strictly below the threshold, PCK(0) = 0.
+
+**Denominator and counting.** For a given evaluated set (for example, a condition and joint group), PCK(α) = (number of eligible joint instances whose estimate is valid and whose error ‖**r**‖ is below α) / (number of eligible joint instances). An **eligible joint instance** is one frame of one primary joint whose ground truth is visible and not a corner placeholder. **Invalid estimates (`D-34a`, Section 5.5.4) stay in the denominator and count as incorrect.** PCK is pooled over all eligible joint instances in the set; per-joint values are reported separately.
+
+**Euclidean error and invalid rate.** Euclidean-error statistics (‖**r**‖ in `s_v` units, and pixels descriptively) use eligible joint instances with **valid** estimates only. The **invalid rate** (invalid estimates ÷ eligible joint instances) is reported separately, overall and per joint.
+
+**These are study-defined choices, not universal conventions.** They are justified by a training-partition scale analysis (1,257 videos; video 1516 excluded by the D-05 rule; medians over videos):
+- The longer box side is 0.909 × `s_v` (equivalently, `s_v` is about 1.10 × the longer box side), and torso length is 0.270 × `s_v`. Thresholds stated relative to other reference scales therefore differ substantially; for example, 0.20 × `s_v` would be about 0.74 torso lengths.
+- The shortest primary limb segment, the forearm, is 0.121 × `s_v` (upper arm 0.136, shin 0.199, thigh 0.212). With α = 0.20, a joint off by about one limb segment could count as correct. α = 0.05 is below half a forearm, and α = 0.10 is just under one forearm.
+- At the median video (`s_v` = 219 px), α = 0.05 and 0.10 correspond to about 10.9 px and 21.9 px.
+
+The thresholds are fixed **before any Penn Action pose-error result has been seen**, including results on the fitting subset. PCK is a descriptive pose-error measure in this study (Section 10.6). If `D-16` later defines severity levels using PCK, it must use these thresholds.
 
 Head-joint error is outside the primary analysis and may be reported only in the exploratory analysis described in Section 6.3.
 
@@ -294,7 +317,7 @@ Head-joint error is outside the primary analysis and may be reported only in the
 Penn Action provides a per-joint visibility flag. Its handling was investigated on the downloaded annotations and is split into two decisions:
 - `D-07a` covers the semantics, error measurement, corruption fitting, the use of visibility as an input, and test-set use. **[ESTABLISHED, v0.6]**
 - `D-07b` covers how invisible ground-truth coordinates enter recogniser inputs. **[ESTABLISHED, v0.9]**
-- `D-34`, a related but separate decision, covers RTMPose invalid keypoints (Section 5.5.4). **[OPEN]**
+- `D-34`, a related but separate decision, covers RTMPose invalid keypoints (Section 5.5.4). **[`D-34a` ESTABLISHED, v0.10; `D-34b` OPEN]**
 
 **[ESTABLISHED]** All rules are applied **consistently across all conditions**, and are recorded before any test-set evaluation.
 
@@ -385,18 +408,36 @@ Both partner copying and the `c_v` fallback remain approximations, not recovered
 
 **Interaction with other decisions.** D-07b is applied at the original frame rate, before temporal preprocessing (`D-20`, open) and before normalisation (Section 9.4.3). It does not depend on how D-20 is resolved. Because the D-12 normalisation is computed from boxes rather than joints, D-07b changes only the coordinate values being normalised.
 
-#### 5.5.4 RTMPose invalid keypoints (`D-34`, open) **[OPEN]**
+#### 5.5.4 RTMPose invalid keypoints (`D-34a` resolved in v0.10; `D-34b` open)
 
 Related to D-07b, but a separate decision.
 
-**Established:**
-- **Native rule of the estimator.** RTMPose marks a keypoint as invalid when its score is ≤ 0. Its location is then set to −1 before conversion to image coordinates, which places it just outside the top-left corner of the crop (`docs/POSE_ESTIMATION_SETUP.md`, Section 4). Invalid keypoints are identified by their **score**, not by their converted coordinates.
-- **No raw sentinel coordinates in recogniser inputs.** The location produced for an invalid keypoint never enters a recogniser input as if it were a real position.
-- **Estimator-only repair.** Any repair of an invalid keypoint uses **estimator outputs only**. Ground-truth joint coordinates, ground-truth visibility and ground-truth-derived box centres are never used.
+**Native behaviour of the installed MMPose 1.3.2 decoder** (established facts; `docs/POSE_ESTIMATION_SETUP.md`, Section 4):
+- A keypoint's score is the smaller of its two axis maxima. When that score is ≤ 0, **both** coordinates are set to −1 SimCC bin, which becomes −0.5 input pixel after decoding. With flip test, the two predictions are averaged before decoding, so it is the averaged score that matters.
+- That value is then converted to image coordinates, which places it slightly beyond the top-left corner of the crop. **The resulting coordinate is finite and can lie inside the image** whenever the crop's corner is inside the image. It also depends on the crop, which comes from the ground-truth box.
+- Consequently, an invalid keypoint **cannot** be recognised from its location.
 
-**Not yet decided:** the detailed handling (for example temporal interpolation within the estimated track, endpoint holding, or a neutral coordinate when no valid observation exists). Excluding frames or videos is not favoured, because paired evaluation requires identical test sets and sequence lengths across conditions, but this is not yet decided either. How often invalid keypoints occur on Penn Action is **unknown**; no invalid keypoint occurred in the smoke tests. The final policy will be decided after Penn Action inference has measured their frequency.
+**D-34a rules (resolved in v0.10) [ESTABLISHED]:**
+1. **Validity checks.** An estimated keypoint is **invalid** if any of the following holds:
+   - its score is ≤ 0;
+   - its score is not finite;
+   - either of its predicted coordinates is not finite.
 
-Invalid estimates are excluded from the residual bank (`D-06a`, `D-18`, Section 8.2).
+   A finite coordinate that comes with a score ≤ 0 is still invalid and is never used. Detection uses only these score and coordinate-validity checks, **never the apparent location** of a zero-score prediction. No other score threshold is applied; scores are not recogniser inputs (`D-23`).
+2. **Raw output preserved.** The native MMPose decoding is left unchanged, and the raw outputs (17 keypoints in image coordinates, with their scores) are stored unmodified for auditability (Section 5.3). Validity flags are derived from them and stored alongside.
+3. **No invalid coordinate in recogniser inputs.** The location of an invalid keypoint never enters a recogniser input, a residual or a metric as if it were a real position.
+4. **Residuals.** Invalid estimates are excluded from residual estimation and from the residual bank (`D-06a`, `D-18`, Section 8.2).
+5. **Metrics.** In PCK, an invalid estimate counts as **incorrect**. Euclidean-error statistics use valid estimates only, and the invalid rate is reported separately (Section 5.4.1).
+6. **Estimator-only repair.** Any repair uses **estimator outputs and image size only**. Ground-truth joint coordinates, ground-truth visibility and ground-truth-derived box centres are never used.
+7. **Imputation step 1 (resolved).** For recogniser inputs, an invalid keypoint in the 12-joint representation is replaced, at the original frame rate and before normalisation, by linear interpolation in time between the same keypoint's nearest valid estimates. At the start or end of the video, the nearest valid estimate is held.
+8. **No exclusion.** No frame or video is dropped because of invalid keypoints, because paired evaluation requires identical test sets and sequence lengths in every condition.
+
+**D-34b: imputation steps 2–4 [OPEN; provisional pending measurement E1]:**
+- **Step 2:** if a keypoint is never valid anywhere in the video, copy its left/right partner's estimated track, but only if that track contains usable estimates after step 1 has been applied to it (that is, the partner has at least one valid estimate in the video). If the partner track is also entirely invalid, go to step 3.
+- **Step 3:** otherwise, use the per-video mean position of the valid estimated primary keypoints. The mean is calculated from the **original valid estimates, before any imputation**: the x and y coordinates are each averaged over all valid joint-frame observations of the primary keypoints in that video. Values imputed by step 1 or step 2 are not included.
+- **Step 4:** if no primary keypoint is valid anywhere in the video, use the image centre (W/2, H/2). Such a video is flagged, retained and reported.
+
+These steps use no ground-truth coordinates, visibility or box centres. They remain **provisional** until **measurement E1** has been made on the fitting subset after Penn Action inference. E1 counts: the invalid rate per primary joint and per video; the longest run of invalid frames; the number of keypoint tracks never valid in their video; the number of frames with no valid primary keypoint; and the number of videos that would need steps 2–4. If E1 finds that steps 2–4 would never be needed, they may be simplified. How often invalid keypoints occur on Penn Action is currently **unknown**; none occurred in the smoke tests.
 
 ---
 
@@ -563,7 +604,7 @@ Validation data with the condition's own pose source (estimated poses for C3; gr
 
 ### 7.4 Test-time corruption sampling in C4 **[PROPOSED]**
 
-For each severity level, C4 uses **multiple fixed corruption draws**, each generated from its own recorded seed, rather than a single random draw. Each final ground-truth-trained model (shared with C1 and C2) is evaluated on every draw. Repeated draws make it possible to separate the effect of **corruption severity** from the **random sampling variation** of any one particular corrupted test set. The number of draws per severity remains open (`D-14`).
+For each severity level, C4 uses **multiple fixed corruption draws**, each generated from its own recorded seed, rather than a single random draw. Each final ground-truth-trained model (shared with C1 and C2) is evaluated on every draw. Repeated draws make it possible to separate the effect of **corruption severity** from the **random sampling variation** of any one particular corrupted test set. The number of draws per severity remains open (`D-14`). The numerical seeding scheme for corruption draws, including whether a draw's source assignment is reused across severity levels, is decided together with D-14 (`D-15b`, open; Section 8.2.3).
 
 ---
 
@@ -584,14 +625,9 @@ For each severity level, C4 uses **multiple fixed corruption draws**, each gener
 
 1. Run RTMPose on the **fitting subset** and map the output to the 12-joint primary representation (Sections 5–6).
 2. Compute residuals as defined in Section 8.2.1 (`D-06a`) and store them in the residual bank described in Section 8.2.2 (`D-18`).
-3. Fit or summarise an error model from these residuals. Candidates are listed in `D-15`:
-   - independent per-joint Gaussian or empirical distributions;
-   - per-joint models that account for direction and correlation between the x and y coordinates;
-   - models that also capture temporal correlation of errors within a video;
-   - models that capture occasional large failures, such as outliers or left/right swaps;
-   - resampling of measured whole-pose residual sequences from the bank.
+3. Generate corruption by **resampling measured, contiguous whole-pose residual sequences** from the bank (`D-15a`, resolved in v0.10; Section 8.2.3). No parametric error model is fitted. The candidate families considered were independent per-joint Gaussian or empirical distributions, models with x–y correlation, models with temporal correlation, models with outliers or left/right swaps, and resampling of measured sequences.
 4. Define a set of severity levels, for example by scaling the fitted error model (`D-16`).
-5. **C4:** apply corruption at each severity level to ground-truth test poses, using multiple fixed, recorded seeds per severity (Section 7.4, `D-14`).
+5. **C4:** apply corruption at each severity level to ground-truth test poses, using multiple fixed, recorded corruption draws (Section 7.4, `D-14`). The seeding scheme is open under `D-15b`.
 6. **C5:** apply corruption stochastically to ground-truth training poses during training, with an augmentation probability and severity range to be decided (`D-17`). The augmentation settings are chosen without reference to C5 validation or test performance.
 
 #### 8.2.1 Residual definition (`D-06a`, resolved in v0.9) **[ESTABLISHED]**
@@ -604,8 +640,8 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
 
 - **Signed x and y components are kept separately.** No reduction to a single distance is made when storing residuals.
 - **Source:** the **fitting subset only** (`D-10`).
-- **Eligible entries:** the ground-truth joint is **visible** and **not a corner placeholder** (`D-07a`), **and** the estimate is **valid and not imputed** (score > 0; `D-34`).
-- **Reporting:** pose error is reported as the Euclidean norm ‖**r**‖ in `s_v` units. Pixel error is given as descriptive supplementary information. The PCK reference scale is `s_v`; the threshold fraction(s) *α* remain open (`D-06b`).
+- **Eligible entries:** the ground-truth joint is **visible** and **not a corner placeholder** (`D-07a`), **and** the estimate is **valid and not imputed** (validity checks of `D-34a`, Section 5.5.4).
+- **Reporting:** pose error is reported as the Euclidean norm ‖**r**‖ in `s_v` units. Pixel error is given as descriptive supplementary information. The PCK reference scale is `s_v`; the thresholds and AUC are defined in Section 5.4.1 (`D-06b`).
 - **Relationship to D-12:** because **r** is the error in the D-12-normalised space the recogniser receives, adding a residual in that space is identical to adding **r** · s<sub>v</sub> in pixels before normalisation. This satisfies the condition under which corruption and normalisation can be applied in either order (Section 9.4.3).
 - **Same units everywhere:** the same definition applies in every video and condition.
 
@@ -620,10 +656,70 @@ Here *s*<sub>v</sub> is the video's D-12 scale and *u* = (p − c<sub>v</sub>)/s
   - *temporally interpolated values*: invented values filling gaps between measured residuals. They are smoother than real errors and would probably understate errors during occlusion.
   - *values borrowed from other fitting videos*: real errors, but taken from a different video and pose, which breaks the consistency between joints.
 
-  Interpolated and borrowed values are **not** stored as measured residuals. Whether either is used when corruption is applied is part of `D-15` (open).
-- **Deferred to D-15:** how gaps are handled when corruption is applied (for example, leaving a joint uncorrupted where no residual exists, interpolating, or borrowing), and how residual sequences are sampled. Wrap-around of a shorter source sequence is to be avoided, because it repeats the same error pattern and creates a discontinuity where it loops.
+  Interpolated and borrowed values are **not** stored as measured residuals. Under `D-15a` (Section 8.2.3), neither is used when corruption is applied.
+- **Gap handling and sequence sampling:** resolved under `D-15a` (Section 8.2.3). Wrap-around of a shorter source sequence is not used.
 - **Training evidence on missing data** (ground-truth side only): 76.8% of primary-joint entries in the training partition have a visible, non-placeholder ground truth. Only 21.5% of frames have all 12 primary joints visible, so restricting the bank to fully observed frames would be impractical and biased by class. Missing data on the estimator side is unknown until inference.
 - **Limitation:** errors at occluded joints are never measured, so the corruption may understate them (Section 12).
+
+#### 8.2.3 Corruption sampling (`D-15a` resolved in v0.10; `D-15b` open)
+
+**D-15a (resolved in v0.10) [ESTABLISHED].** Corruption is generated by **non-parametric resampling of measured, contiguous whole-pose residual sequences**. No parametric error model is fitted, and no Gaussian or independence assumption is made. This is a documented method; it has **not** yet been implemented or run.
+
+**Bank.** For each video *v* in the fitting subset (`D-02`): the residuals **R**<sub>v</sub> (T<sub>v</sub> frames × 12 joints × 2 signed components, in `s_v` units; `D-06a`) and the availability mask **M**<sub>v</sub> (T<sub>v</sub> × 12; true only where a measured residual exists, `D-18`).
+
+**Eligible sources for a target video τ:** S(τ) = the fitting-subset videos *v* with *v* ≠ τ and at least one measured residual, listed in ascending video-identifier order. A video is therefore never its own source (no source–target overlap). Videos with no measured residual, such as video 1516, are never sources.
+
+**Sampling for a target of T frames,** given a random generator *g* supplied for that sampling event (the seeding scheme is `D-15b`):
+0. **Fail fast if there is no eligible source.** If S(τ) is empty, sampling **stops with an error** for that target and the run is not continued. No empty, partial or uncorrupted sequence is substituted silently.
+1. **Single window (preferred).** Let L = the members of S(τ) with T<sub>v</sub> ≥ T, in ascending identifier order. If L is not empty:
+   - draw *i* = *g*.integers(0, |L|) and take *v* = L[*i*];
+   - draw the offset *o* = *g*.integers(0, T<sub>v</sub> − T + 1);
+   - take **E** = **R**<sub>v</sub>[*o* : *o* + T] and **A** = **M**<sub>v</sub>[*o* : *o* + T].
+
+   There is no seam.
+2. **Concatenation (only if no eligible source has at least T frames).**
+   - Draw a permutation P = *g*.permutation(S(τ)) of the identifier-ordered list.
+   - Take sources in the order of P. Append each source's **whole** sequence, starting at its first frame.
+   - When the accumulated length reaches or exceeds T, **trim the last appended source from its end**, keeping only its first (T − length accumulated before it) frames.
+   - If P is exhausted before T frames are reached, draw a new permutation of S(τ) with the same generator and continue. A source is therefore reused only after every eligible source has been used once in the current pass.
+   - **Seam positions** are the target frame indices (other than 0) at which a new source begins.
+3. **Application (G0 gap handling).** For each frame *t* and joint *j*:
+   - **ũ**<sub>t,j</sub> = **u**<sub>t,j</sub> + *k* · **E**<sub>t,j</sub> if **A**<sub>t,j</sub> is true;
+   - otherwise **ũ**<sub>t,j</sub> = **u**<sub>t,j</sub>: **no residual is added where no measured residual is available**.
+
+   Here **u** is the D-12-normalised ground-truth pose (after `D-07b`) and *k* is the severity multiplier (`D-16`, open). Whether a C5 training example is corrupted, and at which severity, is `D-17` (open).
+
+**Guarantees.**
+- **No wrap-around:** a source is never read past its end.
+- **No fabricated values:** only measured residuals are added; no interpolated or borrowed values (`D-18`).
+- **No source–target overlap.**
+- **No validation or test residuals:** the bank comes from the fitting subset only (`D-10`).
+- **The target contributes only its length and its own ground-truth pose.** No target labels, visibility or results are used.
+
+**Logging (for every sampled target).** The target identifier and length; the case used (single window or concatenation); the source identifiers in order; the offset (single window); the seam positions (concatenation); the coverage (fraction of the T × 12 entries with a measured residual); the severity *k*; and the seed identifier under the `D-15b` scheme.
+
+**D-15b (open): numerical seeding scheme.** How generators are seeded for C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels, is decided together with `D-14` (number of draws). It is not fixed here.
+
+**Measurements planned after Penn Action inference (descriptive; fitting subset only; none has been run):**
+- **E2:**
+  - bank coverage overall, per joint and per action;
+  - the distribution of gap lengths, combining ground-truth and estimator gaps;
+  - how often seams occur, simulated over fitting-video lengths;
+  - how often a corrupted joint switches between corrupted and uncorrupted frames.
+- **E3 (the realism check of Section 8.3):** leave-one-video-out within the fitting subset. At measured entries only, compare synthetic and real residuals:
+  - per-joint |**r**| quantiles;
+  - lag-1 autocorrelation;
+  - the distribution of frame-to-frame changes;
+  - left/right partner correlation.
+
+  E3 cannot evaluate behaviour inside gaps, where real errors are unmeasurable.
+
+**Assumption (unverified):** Penn Action's frame rate is not recorded in the annotations. Transplanting residual sequences between videos assumes that a frame is a comparable time step across videos.
+
+**Limitations:**
+- **G0 under-corrupts:** joints without a measured residual are left uncorrupted. On the ground-truth side alone, about 23% of primary-joint entries have no measured residual (Section 8.2.2), and estimator-side gaps will add to this. C4 may therefore be milder than real estimation error, especially at occluded joints.
+- A corrupted joint can switch back to its ground-truth position at the edges of a gap.
+- When the target is longer than every source, the single-window rule favours long source videos, and concatenation introduces seams.
 
 ### 8.3 Realism check **[PROPOSED]**
 
@@ -631,7 +727,8 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 
 ### 8.4 Unresolved questions **[OPEN]**
 
-- The family of corruption distributions, including the handling of residual gaps and the sampling of residual sequences (`D-15`).
+- *(The corruption family, gap handling and sequence sampling are now resolved: `D-15a`, Section 8.2.3.)*
+- The numerical seeding scheme for corruption sampling (`D-15b`), decided together with `D-14`.
 - The number and definition of severity levels (`D-16`).
 - The augmentation probability and severity schedule for C5 (`D-17`).
 - The number of C4 corruption draws per severity (`D-14`).
@@ -666,7 +763,7 @@ As a descriptive diagnostic, which does not change the conditions, the distribut
 - Temporal preprocessing for sequences of different lengths: resampling to a fixed length, padding or cropping (`D-20`).
 - *(Pose normalisation is now resolved: `D-12`, Section 9.4.)*
 - *(Representation of invisible ground-truth joints in model input is now resolved: `D-07b`, Section 5.5.3.)* Visibility flags are never inputs, and ground-truth visibility is never applied to estimated poses (`D-07a`).
-- Detailed representation of RTMPose keypoints with score ≤ 0 in model input (`D-34`, Section 5.5.4; native rule and principles recorded, final handling open).
+- Representation of invalid RTMPose keypoints in model input: validity checks and same-joint temporal imputation resolved (`D-34a`); fallback steps 2–4 provisional pending measurement E1 (`D-34b`, Section 5.5.4).
 - Feature engineering for classical models, such as summary statistics over time, velocities or joint angles (`D-19`).
 - Class-imbalance handling, such as class weighting (`D-24`).
 
@@ -703,13 +800,13 @@ Ground-truth bounding boxes are **supplied oracle information** in this study's 
 The proposed order of preprocessing steps is listed below. Where a step depends on an open decision, its content, and if necessary its position, will be confirmed when that decision is made.
 
 1. **Joint mapping** to the 12-joint primary representation (`D-09`, `D-11`).
-2. **Unreliable coordinates:** corner placeholders in ground-truth poses (`D-07b`, resolved in v0.9; ground-truth poses only; Section 5.5.3) and RTMPose invalid keypoints (`D-34`, open; estimated poses only; Section 5.5.4). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions.
-3. **Corruption** (C4 and C5 only; `D-14`–`D-17` open; `D-18` resolved, Section 8.2.2).
+2. **Unreliable coordinates:** corner placeholders in ground-truth poses (`D-07b`, resolved in v0.9; ground-truth poses only; Section 5.5.3) and RTMPose invalid keypoints (`D-34a` resolved, `D-34b` open; estimated poses only; Section 5.5.4). This step is placed before normalisation so that placeholder or sentinel locations are dealt with before they are treated as image positions.
+3. **Corruption** (C4 and C5 only; `D-15a` and `D-18` resolved, Sections 8.2.2–8.2.3; `D-14`, `D-15b`, `D-16` and `D-17` open).
 4. **Per-video normalisation** (`D-12`, this section).
-5. **Temporal preprocessing** (`D-20`, open). Corruption is placed before this step because any temporally correlated error model (`D-15`) is defined at the original frame rate.
+5. **Temporal preprocessing** (`D-20`, open). Corruption is placed before this step because the residual sequences resampled under `D-15a` (Section 8.2.3) are defined at the original frame rate.
 6. **Feature construction and any data-fitted standardisation** (`D-19`, open; Section 4.4, Stage B, item 9).
 
-**Corruption and normalisation.** The normalisation is a per-video translation plus a uniform scaling. If a corruption residual `e` is expressed in units of the same per-video scale `s_v`, then adding `e · s_v` in pixel space before normalisation gives exactly the same result as adding `e` after it: `((p + e · s_v) − c_v) / s_v = (p − c_v) / s_v + e`. In that case the two steps can be applied in either order. **This equivalence holds only when corruption is expressed in compatible per-video scale units.** It does not hold in general, for example for residuals expressed in pixels or in a per-frame scale. *(Updated in v0.9.)* Residuals are now expressed in units of `s_v` (`D-06a`, resolved; Section 8.2.1), so this condition is met for corruption built from them. Any corruption model adopted under `D-15` must keep residuals in these units for the equivalence to hold.
+**Corruption and normalisation.** The normalisation is a per-video translation plus a uniform scaling. If a corruption residual `e` is expressed in units of the same per-video scale `s_v`, then adding `e · s_v` in pixel space before normalisation gives exactly the same result as adding `e` after it: `((p + e · s_v) − c_v) / s_v = (p − c_v) / s_v + e`. In that case the two steps can be applied in either order. **This equivalence holds only when corruption is expressed in compatible per-video scale units.** It does not hold in general, for example for residuals expressed in pixels or in a per-frame scale. *(Updated in v0.9.)* Residuals are now expressed in units of `s_v` (`D-06a`, resolved; Section 8.2.1), so this condition is met for corruption built from them. The corruption method adopted under `D-15a` (Section 8.2.3) resamples residuals in these units, so the equivalence holds for it.
 
 #### 9.4.4 Pre-registered sensitivity analysis S1 (secondary)
 
@@ -717,7 +814,7 @@ The proposed order of preprocessing steps is listed below. Where a step depends 
 - **Computed from the pose actually supplied to the model:** ground truth in C1, estimated poses in C2, C3 and C5 testing, and corrupted ground truth in C4. A reference derived from ground truth is **never** applied to estimated poses, consistent with `D-07a` rule 4.
 - **Timing:** run only **after the primary analysis is complete**, with all primary settings frozen (no retuning). It is reported as a secondary analysis and does not replace the primary result.
 - **Purpose:** to test whether conclusions depend on the coordinate representation. Under S1, estimator error in the hip joints also shifts the reference point, so differences between S1 and the primary result are themselves informative.
-- **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with `D-07b` (resolved in v0.9) and the eventual `D-34` decision.
+- **Not yet specified, and not implemented:** the exact body-scale definition, and the handling of frames where the hip joints are invisible or invalid. These will be fixed before S1 is run, consistently with `D-07b` (resolved in v0.9), `D-34a` (resolved in v0.10) and the eventual `D-34b` decision.
 
 ---
 
@@ -846,6 +943,8 @@ This protocol is version-controlled. Any change after experiments begin is recor
 - **Ground-truth annotation noise:** Penn Action annotations are themselves imperfect, so "error" is measured relative to a noisy reference.
 - **Invisible joints** do not have reliable ground-truth coordinates: some are corner placeholders, and the rest are plausible but often frozen (Section 5.5.1; corrected in v0.9). They are excluded from error measurement and corruption fitting (`D-07a`). As a result, estimator accuracy on occluded or out-of-frame joints is not measured against ground truth, and the corruption model is fitted only on visible joints, so it may understate errors at occluded joints (`D-18`). In recogniser inputs, corner placeholders are replaced by approximations (partner track or video centre), not recovered ground truth, and frozen invisible coordinates remain (`D-07b`). Both may affect ground-truth versus estimated-pose comparisons such as C1 versus C2.
 - **Synthetic corruption fidelity:** the corruption model may not capture all properties of real estimator errors, such as temporal correlation, structured failures or left/right swaps. This limits how far C4 results generalise.
+- **Under-corruption from G0 gap handling:** where no measured residual exists, no corruption is added (`D-15a`, Section 8.2.3). About 23% of primary-joint entries lack a measured residual on the ground-truth side alone (training partition), so C4 and C5 corruption may be milder than real estimation error, especially at occluded joints.
+- **Comparable time steps (unverified assumption):** Penn Action's frame rate is not recorded in the annotations. Resampling residual sequences across videos, and temporal preprocessing (`D-20`), assume that frames are comparable time steps across videos.
 - **Frozen hyperparameters transferred to a larger training set:** all hyperparameters, including the epoch count for the temporal CNN, are selected while training on ~85% of the training partition, then reused when refitting on 100%. The optimal values on the larger set may differ slightly. For example, the effective strength of regularisation can depend on the number of training samples, and the best training duration may change. No validation check is possible during refitting. This applies equally to all conditions.
 - **Smaller corruption-fitting sample:** using the fitting subset only (~85% of training videos) gives slightly less data for estimating the error model, which is accepted in exchange for strict data separation.
 - **Multiple sources of variance:** training seeds, corruption draws and test-set sampling all affect the precision of comparisons (Section 10.4).
@@ -888,12 +987,15 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-06b *(v0.10)* | PCK thresholds and AUC | Primary α = **0.05** × `s_v`; supplementary α = **0.10** × `s_v`; PCK curve at α = 0.00, 0.01, …, 0.20; normalised AUC = trapezoidal area over [0, 0.20] divided by 0.20 (range 0–1). Correct means error strictly below α × `s_v`. Denominator: eligible joint instances (visible, non-placeholder ground truth); invalid estimates count as incorrect. Euclidean-error statistics use valid estimates only, with the invalid rate reported separately. **Study-defined choices, not universal conventions**, justified by a training-partition scale analysis (forearm 0.121 × `s_v`; torso 0.270 × `s_v`; longer box side 0.909 × `s_v`). Fixed before any Penn Action pose-error result has been seen (Section 5.4.1). |
+| D-15a *(v0.10)* | Corruption family, gaps and sampling | Non-parametric resampling of **measured, contiguous whole-pose residual sequences** from the fitting-subset bank; no parametric model. **G0:** no residual added where none was measured. Sources: fitting videos other than the target with at least one measured residual, in identifier order. A single window from a source at least as long as the target (index, then offset drawn uniformly); otherwise deterministic concatenation of whole sequences in a drawn permutation, trimmed from the end of the last piece, with reuse only after every source has been used once; seams recorded. No wrap-around; no source–target overlap; no fabricated values. If no eligible source exists, sampling stops with an error (no silent empty or partial sequence). Logged per target: sources, offsets, seams, coverage, severity, seed identifier. Not yet implemented or run. Limitations: G0 under-corruption; comparable-time-step assumption (Section 8.2.3). |
+| D-34a *(v0.10)* | RTMPose invalid keypoints: validity, metrics and first imputation step | Invalid if score ≤ 0, score not finite, or a predicted coordinate not finite; a finite coordinate with score ≤ 0 is still invalid. Detection never uses the apparent location (which is finite and can lie inside the image). Native decoding and raw outputs are preserved for auditability. Invalid estimates are excluded from residuals, count as incorrect in PCK and are excluded from Euclidean-error statistics (invalid rate reported). Recogniser-input imputation step 1: same-joint linear interpolation in time, holding the nearest valid value at the ends. Repairs use estimator outputs and image size only; no frame or video is excluded (Section 5.5.4). |
 | D-02 *(v0.9)* | Validation split | Class-stratified 15% split of the official training partition: **1,070 fitting / 188 validation** videos. Classes in alphabetical order; IDs sorted ascending within each class; `n_val = floor(0.15·n_class + 0.5)`; one `numpy.random.default_rng(20261126)` generator across all classes, with `perm[:n_val]` of `rng.permutation(n_class)` as validation. Sorted ID lists to be stored as text files when implementation begins (not yet created); SHA-256 validation `9863e3a89640cdc76861e310a11527d3748e379f15910a1ce166d0468b0d5828`, fitting `b84e4fdab0772dd1430df33a1c62bd6f217d6661ca7ab444beadd3e0bcdbed55`. Roles: fitting subset for Stage A fitting and the residual bank (a video is never its own corruption source); C1 validation for model and hyperparameter selection; C2–C5 validation results descriptive only and never used to tune settings; hashes computed on four-digit zero-padded IDs, ascending, LF-separated with a final LF, ASCII; all 1,258 for Stage B; test partition only for final evaluation (Section 4.1.1). |
-| D-06a *(v0.9)* | Residual units and error reference scale | **r** = (p̂ − p)/s<sub>v</sub> = û − u, in original-image pixel coordinates after the D-09/D-11 mapping; signed x and y kept separately. Fitting subset only; eligible entries need visible, non-placeholder ground truth and a valid, non-imputed estimate (score > 0). Error reported as ‖**r**‖ in `s_v` units, with pixel error as descriptive supplementary information; PCK reference scale `s_v`. Satisfies the condition for corruption and normalisation to commute (Section 9.4.3). No residual distribution has yet been measured (Section 8.2.1). PCK threshold α is the separate open item D-06b. |
+| D-06a *(v0.9)* | Residual units and error reference scale | **r** = (p̂ − p)/s<sub>v</sub> = û − u, in original-image pixel coordinates after the D-09/D-11 mapping; signed x and y kept separately. Fitting subset only; eligible entries need visible, non-placeholder ground truth and a valid, non-imputed estimate (validity as defined by D-34a). Error reported as ‖**r**‖ in `s_v` units, with pixel error as descriptive supplementary information; PCK reference scale `s_v`. Satisfies the condition for corruption and normalisation to commute (Section 9.4.3). No residual distribution has yet been measured (Section 8.2.1). PCK thresholds: D-06b (resolved in v0.10). |
 | D-07b *(v0.9)* | Invisible ground-truth coordinates in recogniser inputs | **Option A.** Invisible coordinates that are not corner placeholders are retained as released. Corner placeholders (x < 1 and y < 1, including (0,0)) are detected by coordinates alone, with no visibility flags. The supporting evidence is from the training partition only; the rule is applied to all ground-truth poses given to a recogniser, and test-partition prevalence has not been examined. Partly placeholder tracks: linear interpolation in time from the same joint's own non-placeholder observations, holding at the endpoints. Entirely placeholder tracks: the partner joint's track if it is placeholder-free, otherwise the constant video centre `c_v`, decided once per track (training partition: 601 of 1,095 tracks use partner copying, 54.9%; 494 use `c_v`, 45.1%). No parent-joint or per-frame box-centre substitution. Partner copying and the video-centre fallback are **approximations, not recovered anatomical ground truth**. Applied to ground-truth poses only, at the original frame rate. Limitation: frozen invisible coordinates remain (Section 5.5.3). |
-| D-18 *(v0.9)* | Visibility in corruption | Corruption is **not conditioned on target visibility**. The residual bank stores only **genuinely measured** residuals (visible, non-placeholder ground truth; valid estimates), with an availability mask. Measured residuals are distinguished from temporally interpolated or borrowed values, which are not stored as measured residuals. Gap handling and sequence sampling are deferred to D-15. Limitation: errors at occluded joints are not measured (Section 8.2.2). |
+| D-18 *(v0.9)* | Visibility in corruption | Corruption is **not conditioned on target visibility**. The residual bank stores only **genuinely measured** residuals (visible, non-placeholder ground truth; valid estimates), with an availability mask. Measured residuals are distinguished from temporally interpolated or borrowed values, which are not stored as measured residuals. Gap handling and sequence sampling are deferred to D-15 (resolved as D-15a in v0.10: G0, no interpolated or borrowed values; Section 8.2.3). Limitation: errors at occluded joints are not measured (Section 8.2.2). |
 | D-05 *(v0.8; amended v0.9)* | Ground-truth bounding boxes: validity, fallback and cropping | **Valid box:** row exists, four finite values, x2 > x1 and y2 > y1 (box values only). Rows aligned to frames from the first frame; frames without a row are invalid; surplus rows ignored. D-12 medians use valid boxes only. Invalid-box frames use the nearest valid box in the same video (ties: earlier frame); videos with no valid box use the full image `[0, 0, W, H]` (and the image centre and diagonal for D-12), and are reported. All frames and videos retained. Invalid boxes replaced before inference. Crop settings as verified in the project's installed MMPose 1.3.2 pipeline: padding 1.25, then enlargement to the 3:4 input aspect ratio; not tuned. *Evidence-supported inference, not a documented fact:* boxes are the visible-joint extent (head included) enlarged 1.2× and clipped to the image; reproduces 99.86% of training boxes within 1 px; exceptions 2263 and 2276 unexplained; clipping boundaries uncertain. Boxes therefore carry privileged ground-truth-derived localisation: a documented exception to D-07a rule 4, and a limitation (Sections 5.2, 5.5.2, 12). **Amendment (v0.9):** a valid box also needs a diagonal ≥ 0.05 × the actual image diagonal. Only training video 1516 (placeholder box `[0.73, 0.73, 7.31, 7.31]`, 0.016 of the image diagonal; smallest elsewhere 0.086) is affected; it uses the full-image fallback, `c_v` = (240, 175.5) and `s_v` ≈ 594.6 px. Other D-05 rules and the D-12 method are unchanged. |
-| D-12 *(v0.7)* | Pose normalisation and ordering | **Per-video bounding-box normalisation:** `(joint − c_v) / s_v`, where `c_v` is the median centre and `s_v` the median diagonal of that video's **valid** ground-truth boxes, with the same scale for x and y. The transform depends only on boxes, so it is identical for a given video in C1–C5. Within-video movement is preserved: no per-frame recentring or rescaling, rotation alignment or mirroring. Boxes are supplied oracle information; test videos are normalised with their own ground-truth boxes, with no model parameters fitted and no labels used. The boxes carry inferred ground-truth pose information (extent, centre and scale of the visible joints; Section 5.2.1), entering only through per-video medians, under the D-05 exception to D-07a rule 4. Box validity and fallback rules: D-05 (resolved v0.8; amended v0.9). Proposed processing order recorded (Section 9.4.3), dependent on D-07b, D-34, D-14–D-18, D-20 and D-19. Corruption and normalisation are interchangeable in order **only** if residuals use compatible per-video scale units; residuals in units of `s_v` were adopted under D-06a (v0.9). Pre-registered secondary sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, computed from the pose supplied to the model, run only after the primary analysis (Section 9.4). |
+| D-12 *(v0.7)* | Pose normalisation and ordering | **Per-video bounding-box normalisation:** `(joint − c_v) / s_v`, where `c_v` is the median centre and `s_v` the median diagonal of that video's **valid** ground-truth boxes, with the same scale for x and y. The transform depends only on boxes, so it is identical for a given video in C1–C5. Within-video movement is preserved: no per-frame recentring or rescaling, rotation alignment or mirroring. Boxes are supplied oracle information; test videos are normalised with their own ground-truth boxes, with no model parameters fitted and no labels used. The boxes carry inferred ground-truth pose information (extent, centre and scale of the visible joints; Section 5.2.1), entering only through per-video medians, under the D-05 exception to D-07a rule 4. Box validity and fallback rules: D-05 (resolved v0.8; amended v0.9). Proposed processing order recorded (Section 9.4.3), dependent on D-07b, D-34a, D-34b, D-14, D-15a, D-15b, D-16, D-17, D-18, D-20 and D-19. Corruption and normalisation are interchangeable in order **only** if residuals use compatible per-video scale units; residuals in units of `s_v` were adopted under D-06a (v0.9). Pre-registered secondary sensitivity analysis S1: per-frame hip-midpoint centring with a per-video body scale, computed from the pose supplied to the model, run only after the primary analysis (Section 9.4). |
 | D-07a *(v0.6)* | Visibility semantics and use | Values are 0/1, and their meaning is not documented. *Inferred:* 0 includes occluded and out-of-shot joints, and invisible coordinates are not reliable joint positions. *Evidence corrected in v0.9:* placeholders are top-left corner points (x < 1 and y < 1, including (0,0); 78,166 invisible and no visible training observations); excluding them, invisible coordinates are generally anatomically plausible but often frozen; the earlier edge-clamping and distorted-limb-length conclusions mainly reflected corner placeholders and are withdrawn. Rules (unchanged in substance): error measured on visible ground-truth joints only, excluding corner placeholders, with frames lacking any valid visible joint reported as unscorable; corruption fitted on visible residuals from the fitting subset only; visibility flags never recogniser inputs; ground-truth visibility never applied to estimated poses (C2, C3, C5), with one documented exception (v0.8): the supplied bounding boxes, which indirectly encode visible ground-truth pose information (D-05). Apart from that exception, ground-truth visibility flags and ground-truth joint coordinates must never be used to repair, mask or otherwise preprocess estimated poses. D-07b's coordinate-only repairs apply exclusively to ground-truth poses; test-set visibility used only for evaluation eligibility. Visibility-conditioned corruption: governed by D-18 (resolved in v0.9) (Section 5.5). |
 | D-11 *(v0.5)* | Joint column order | 1-based columns: 1 head; 2–3 shoulders; 4–5 elbows; 6–7 wrists; 8–9 hips; 10–11 knees; 12–13 ankles. This is an **evidence-supported inference**, not a documented fact: the official website lists the 13 joints in this order, but no inspected source states that list position *k* is array column *k*. Evidence: agreement with the official list; geometry across all 1,258 training videos (leg chain strongly supported; elbow-versus-wrist weaker because arms bend); visual inspection of 10 overlays (29 frames), 3 independently reviewed by the researcher. Kept separate from D-09 (left/right). Limitations: paper not accessible; individual annotation errors possible; head-point meaning remains under D-08 (Section 6.5). |
 | D-09 *(v0.4)* | Left/right convention | Penn Action columns labelled LEFT hold the subject's anatomical RIGHT, and columns labelled RIGHT hold the anatomical LEFT. Every left/right pair (shoulders, elbows, wrists, hips, knees, ankles) is swapped when mapping to COCO/RTMPose. Evidence: training-partition annotation statistics, plus visual inspection of 15 training videos (7 judgeable, all consistent; 3 independently confirmed by the researcher). RTMPose was not used for the decision. Limitation: verified on a sample, not every video. The original annotation files are unchanged; the swap is applied in project code (Sections 6.2, 6.4). |
@@ -910,10 +1012,9 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-01 | Dataset verification | Confirm that the downloaded files match 2,326 videos, 15 classes, 13 joints and the 1,258/1,068 split; record any discrepancy. *Status (v0.9 audit):* label-level checks done (2,326 label files; 15 actions; 13 joints; 1,258/1,068 split). Known discrepancies include `dimensions` widths of 481/482 for 480-px frames, action names differing from the README, video 1865 having one box row fewer than its frames, and video 1516 (no visible joints; placeholder box). **Outstanding:** frame-level checks (2,326 frame folders; JPEG count equal to `nframes` per video; JPEG size consistent with `dimensions`). |
 | D-03 | RTMPose variant | Model size, its training data, input resolution, and checkpoint name and checksum. *Status (v0.9 audit):* variant, input size, configuration and checkpoint SHA-256 values, and training history (pretraining partly inferred) are documented in `docs/POSE_ESTIMATION_SETUP.md`. **Outstanding:** a recorded rationale for choosing the M size; the licensing question (D-30) remains a separate open risk. |
 | D-04 | Inference implementation | Software stack and version for running RTMPose; dependency pinning in `requirements.txt`. *Status (v0.9 audit):* a separate, locked RTMPose environment is documented (`environments/rtmpose/`). **Outstanding:** this row's wording, and Section 11.1, still refer to `requirements.txt`, which conflicts with the two-environment design; the proposed runtime settings in `configs/pose/rtmpose_m.yaml` (`proposed_freeze`) are not frozen; batched versus per-frame inference equivalence is untested. |
-| D-06b | PCK threshold | The PCK threshold fraction(s) *α* (the reference scale `s_v` is fixed by D-06a). To be fixed before any test-set evaluation (Section 5.4). |
 | D-08 *(exploratory part)* | Exploratory head mapping | Whether a defensible COCO-to-head correspondence exists (assessed on the fitting subset only), and if so which one. Otherwise the head analysis is not performed. |
-| D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). |
-| D-15 | Corruption distribution | The family of error models: independent, correlated, temporal, with outliers or swaps, or resampling of measured residual sequences. *Scope widened in v0.9:* also how residual gaps are handled when corruption is applied (left uncorrupted, interpolated or borrowed) and how residual sequences are sampled (wrap-around to be avoided) (Section 8.2.2). |
+| D-14 | C4 corruption draws | Number of fixed corruption draws per severity level. Multiple draws are favoured (Section 7.4). To be decided together with D-15b. |
+| D-15b | Corruption seeding scheme | The numerical seeding scheme for corruption sampling in C4 draws and C5 augmentation, including whether a C4 draw's source assignment is reused across severity levels. To be decided together with D-14 (Sections 7.4, 8.2.3). |
 | D-16 | Severity levels | The number of severity levels and how each is defined. |
 | D-17 | C5 augmentation | Augmentation probability, severity range or schedule. |
 | D-19 | Classical-model features | The per-video feature representation for logistic regression and random forest. |
@@ -929,7 +1030,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-30 | Estimator licensing | Record the RTMPose/MMPose code and weight licences. |
 | D-31 | Repository licence | Choose a licence for this repository's code. |
 | D-32 | Figures | Whether dataset frames may appear in published figures. |
-| D-34 | RTMPose invalid keypoints in recogniser inputs | *Recorded in v0.9:* the native rule (score ≤ 0 is invalid; location set to −1 before rescaling; identified by score); raw sentinel coordinates never enter recogniser inputs; any repair uses estimator outputs only; invalid estimates are excluded from the residual bank. **Still undecided:** the detailed handling, including whether to interpolate, hold endpoints, use a neutral coordinate or exclude anything. Frequency and final handling require Penn Action inference (Section 5.5.4). |
+| D-34b | RTMPose invalid keypoints: fallback imputation | **Provisional, pending measurement E1:** step 2, when a keypoint is never valid in the video, copy the partner's estimated track only if it contains usable estimates after step 1 (at least one valid estimate); step 3, if the partner track is also entirely invalid, the per-video mean of the original valid estimated primary-keypoint observations (x and y averaged over valid joint-frame observations, before any imputation); step 4, if no primary keypoint is valid anywhere in the video, the image centre (video flagged, retained, reported). No ground-truth coordinates, visibility or box centres. E1, on the fitting subset after inference: invalid rate per joint and video; longest invalid run; never-valid tracks; frames with no valid primary keypoint; videos needing steps 2–4. Steps may be simplified if E1 shows they are never needed (Section 5.5.4). |
 
 ---
 
