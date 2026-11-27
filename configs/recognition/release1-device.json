@@ -1,0 +1,58 @@
+{
+  "record": "Release 1.0 deterministic device qualification (protocol D-36)",
+  "protocol": "v0.14",
+  "created": "2026-11-27T20:10:32+00:00",
+  "qualified_device": "cuda:0",
+  "environment": {
+    "device": "cuda:0",
+    "device_type": "cuda",
+    "device_name": "NVIDIA GeForce RTX 3060 Ti",
+    "python": "3.11.9",
+    "torch": "2.15.0+cu134",
+    "cuda": "13.4",
+    "cudnn": 92600,
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "scikit_learn": "1.9.1",
+    "platform": "Windows-10-10.0.26300-SP0",
+    "processor": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+    "settings": {
+      "deterministic_algorithms": true,
+      "deterministic_warn_only": false,
+      "cudnn_deterministic": true,
+      "cudnn_benchmark": false,
+      "cudnn_allow_tf32": false,
+      "matmul_allow_tf32": false,
+      "float32_matmul_precision": "highest",
+      "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+      "num_threads": 6,
+      "num_interop_threads": 6,
+      "data_loader_workers": 0,
+      "dtype": "float32"
+    }
+  },
+  "qualification": {
+    "config": {
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "dropout": 0.3
+    },
+    "seed": 0,
+    "epochs": 5,
+    "inputs": "ground-truth fitting subset; training-only metrics",
+    "initial_state_sha256": "d16e9ae8e87682f97091964bb77aa01b2dfe47c9492e407b37918bb06b903c4f",
+    "checkpoint_state_sha256": {
+      "5": "951f28a3c06cf2b0de30aac31848e50069f2fe7268f6680624f73103bf9d9d67"
+    },
+    "final_state_sha256": "951f28a3c06cf2b0de30aac31848e50069f2fe7268f6680624f73103bf9d9d67"
+  },
+  "attempts": [
+    {
+      "device": "cuda:0",
+      "qualified": true,
+      "failure": null,
+      "differing_fields": []
+    }
+  ],
+  "run_manifest_sha256": "94ec847066f8da1c8fbe016c101d35acc1592c7be74195e9ec844bd2f7504d36"
+}
