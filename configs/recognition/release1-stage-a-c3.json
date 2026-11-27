@@ -1,0 +1,27 @@
+{
+  "stage": "A",
+  "condition": "C3",
+  "descriptive_only": true,
+  "config": {
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "dropout": 0.1
+  },
+  "epoch": 130,
+  "per_seed": {
+    "0": {
+      "macro_f1": 0.9907647907647908,
+      "accuracy": 0.9946808510638298
+    },
+    "1": {
+      "macro_f1": 0.991919191919192,
+      "accuracy": 0.9946808510638298
+    },
+    "2": {
+      "macro_f1": 0.9920346320346322,
+      "accuracy": 0.9946808510638298
+    }
+  },
+  "stage_manifest_sha256": "8a54d048bd1ffac1a30c45da707072787b46b761f909f171fa77898c9c8c68eb",
+  "selection_record_commit": "c192bae21ec1f583fceaccc684379d2b0e3ed033"
+}
