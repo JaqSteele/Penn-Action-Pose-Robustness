@@ -1,8 +1,8 @@
 # Research Protocol (Draft)
 
 **Project:** Penn Action: Pose Estimation Robustness in Human Action Recognition
-**Document status:** Draft v0.13 for review. Not final.
-**Date of this revision:** 2026-11-26 (v0.1 drafted 2026-11-18)
+**Document status:** Draft v0.14 for review. Not final.
+**Date of this revision:** 2026-11-27 (v0.1 drafted 2026-11-18)
 **Project status at time of writing:** Environment and repository set up. The Penn Action dataset has been downloaded and is stored locally, outside the repository. Its annotation files and a small sample of training frames have been inspected. RTMPose has been run **only in software smoke tests on non-Penn Action images** (an official MMPose test photograph and a synthetic black image), including a single-image CPU-versus-GPU comparison (`docs/POSE_ESTIMATION_SETUP.md`, Sections 4.2 and 5). **No pose has been estimated on any Penn Action frame.** The CPU cross-check listed under `D-04` (Section 5.1) is a planned step of future Penn Action inference, not a completed one. No recognition model has been trained and no experiment has been run. This document contains **no experimental results**.
 
 ### Revision history
@@ -22,6 +22,7 @@
 | v0.11 | 2026-11-26 | **Release 1.0 scope amendment, made before any pose inference, model training or result** (`D-35`). Release 1.0 runs C1, C2 and C3 with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest and the S1 sensitivity analysis are **deferred, not removed**: their methodology is retained for a later release. The research question, the C1–C5 definitions and all previously resolved decisions are unchanged. **Resolved:** D-03 (RTMPose-M rationale), D-04 (inference implementation and runtime settings), D-20 (resampling to 64 frames), D-21 (temporal CNN architecture), D-22 (tuning grid and epoch selection on C1 validation), D-24 (class-weighted loss), D-25 (three seeds), D-26 (10,000 bootstrap resamples), D-27 (percentile intervals; pre-specified seed-averaged procedure, with seed variation reported separately) and D-28 (two planned comparisons, H1 and H2). **Deferred:** D-08 (exploratory part), D-14, D-15b, D-16, D-17 and D-19 (new Section 14.3). **Still open:** D-01, D-29, D-30, D-31, D-32 and D-34b. New label [DEFERRED]; new Sections 1.4, 9.5 and 10.7; Sections 2.2, 4.4, 5.1, 7, 8, 9.1, 9.3, 10.2–10.6, 11.1, 12 and 14 updated. |
 | v0.12 | 2026-11-26 | Clarification only: the canonical order of the 12-joint primary representation is COCO keypoints 5–16 (Section 6.2); the Penn Action table remains the source mapping. Section 9.5.1 cross-reference updated. No methodological decision changed. |
 | v0.13 | 2026-11-26 | **D-34b resolved**, using measurement E1 on the **fitting subset only** (training-partition RTMPose inference at commit `5de1fa8`). Of 885,516 primary keypoint observations in the fitting subset, 20 were invalid under D-34a, in 7 videos. Every one lies in a track with valid estimates elsewhere in the same video, so all 20 were handled by D-34a step 1, and no video required steps 2–4. Steps 2–4 are **retained unchanged as pre-specified safety fallbacks**, and the complete four-step rule is frozen before any test-partition inference. Test-partition E1 results will be descriptive only and cannot change preprocessing (Section 4.3). Sections 5.5, 5.5.4, 9.3, 9.4.3, 9.4.4 and 14 updated. No other methodological decision changed. |
+| v0.14 | 2026-11-27 | **Clarification only: Release 1.0 implementation conventions recorded before any recogniser training** (Batch D2 preparation; no model trained, no Stage A or Stage B run, no validation or test result seen). New Section 9.5.8 records ten items, D-36 to D-45: training device and determinism, with a deterministic device qualification run before Stage A and a pre-specified GPU-to-CPU fallback (D-36); the macro-F1 convention (D-37); use of the last partial batch (D-38); initialisation, optimiser and normalisation defaults (D-39); the weighted-loss reduction (D-40); deterministic reruns with state-hash verification for the Stage A C2 evaluation, and committing the selection record before any C2 or C3 descriptive evaluation (D-41); the storage of experiment outputs (D-42); C3 Stage A evaluation at the selected epoch only (D-43); tie handling and random-number streams (D-44); and the bootstrap seed value, which is implemented as a parameter and remains **open** until it is fixed and committed before any test-partition output is opened (D-45). These items fill details that v0.13 left unspecified. They **do not change** the research question, the C1–C5 definitions, the Release 1.0 scope or any decision resolved in v0.13 or earlier. Section 11.3 (Determinism) and part of Section 11.2 (storage locations), both previously **[PROPOSED]**, are superseded for Release 1.0 by D-36 and D-42. Sections 9.5.5, 9.5.7, 9.5.8 (new), 10.1, 10.7, 11.2, 11.3 and 14 updated. |
 
 ---
 
@@ -910,6 +911,11 @@ About **133,000 parameters** (133,135 by direct count). The architecture is fixe
 
 C2 and C3 validation results are logged but **never** used to change any setting (`D-13`). In Stage B there is no validation monitoring and no early stopping (`D-33`).
 
+*Clarified in v0.14 (Section 9.5.8):*
+- The C2 Stage A result is obtained by deterministic reruns of the selected C1 configuration to *E*. Each rerun must reproduce the recorded state hash and ground-truth validation macro-F1 exactly (`D-41`).
+- C3 Stage A models are evaluated only at *E* (`D-43`).
+- Both descriptive evaluations run only after the selection record has been committed.
+
 #### 9.5.6 Comparable budgets across conditions
 
 C1/C2 and C3 use the same architecture, frozen hyperparameters, epoch count *E*, batch size, optimiser, class-weighting rule, preprocessing pipeline and seed values. The only differences are the pose source used for training and testing.
@@ -923,6 +929,67 @@ Before any test label or test pose output is opened:
 
 Test labels and test pose outputs are read **only** by the final evaluation step, which runs once on the frozen models (Section 4.3).
 
+*Clarified in v0.14:* within Stage A, the selection record is committed **before** any C2 or C3 descriptive evaluation is run (`D-41`, Section 9.5.8). The bootstrap seed value (`D-45`) is also fixed and committed before any test-partition output is opened.
+
+#### 9.5.8 Implementation conventions (`D-36` to `D-45`, recorded in v0.14) **[ESTABLISHED]**
+
+These conventions fill details that Sections 9.5.1–9.5.7 and 10.1–10.7 leave unspecified. They were fixed **before any recogniser was trained** and before any Stage A, Stage B, validation or test result existed. They are **clarifications and implementation conventions**. They do not change any decision resolved in v0.13 or earlier, and they apply identically to every condition and stage. The labels I-1 to I-7 and G-1 to G-3 used during their review are given in brackets.
+
+**D-36: Training device and determinism (I-1).**
+- **Settings:** all recogniser training and evaluation run in FP32, with:
+  - `torch.use_deterministic_algorithms(True)`;
+  - cuDNN deterministic on and cuDNN benchmark off;
+  - TF32 off for both cuDNN and matrix multiplication;
+  - the environment variable `CUBLAS_WORKSPACE_CONFIG=:4096:8` set before CUDA is initialised;
+  - no data-loading worker processes.
+- **Preferred device:** the project GPU.
+- **Deterministic device qualification, before Stage A:**
+  - A short training run (at least five epochs, so that the first five-epoch state hash is included) is repeated twice with identical configuration, seed and data. The SHA-256 of the model state and the **training-only metrics** (for example per-epoch training loss and training accuracy) must be **bit-identical** between the two repetitions.
+  - The qualification uses fitting-subset inputs only. It **must not compute or inspect any validation or test metric**, so it cannot inform model selection.
+- **Fallback, decided in advance:**
+  - If the GPU fails qualification, or deterministic mode raises an error for a required operation, the same qualification is repeated on the CPU with **one thread**.
+  - If the CPU also fails, the work **stops**. Nondeterministic results are never accepted silently, and any continuation requires a dated protocol amendment.
+- **One device throughout:** the qualified device is recorded and fixed before Stage A. It is then used unchanged in every experimental stage and condition: Stage A (C1, C2 and C3), Stage B and the final evaluation. The device never changes between stages or conditions.
+- **Provenance:** every run records the device, and the PyTorch, CUDA, cuDNN, NumPy, SciPy and scikit-learn versions, in addition to the items in Section 11.2.
+
+**D-37: Macro-F1 convention (I-2).** Macro-F1 is averaged over **all 15 classes**, always using the fixed label set 0–14. A class that is never predicted has precision, and therefore F1, set to **0** (`zero_division = 0`). Accuracy is the ordinary proportion of correctly classified videos. Both are computed per video (Section 10.1). The same convention is used for Stage A selection, descriptive results and the bootstrap (Section 10.7).
+
+**D-38: Last partial batch (I-3).** The last incomplete batch of each epoch is kept (`drop_last = False`), so every training video is used in every epoch. With batch size 32, an epoch is 34 optimiser steps in Stage A (1,070 videos) and 40 in Stage B (1,258 videos). This difference follows from `D-33` and is covered by the limitation in Section 12.
+
+**D-39: Initialisation, optimiser and normalisation defaults (I-4).**
+- **Defaults:**
+  - PyTorch's default parameter initialisation;
+  - PyTorch's default BatchNorm settings, with evaluation in inference mode, using running statistics and no gradients;
+  - AdamW's default settings apart from the learning rate and weight decay selected under `D-22`.
+- **Weight decay** applies to **all** parameters, including biases and BatchNorm parameters.
+- **Not used:** gradient clipping, learning-rate warm-up, learning-rate schedules, label smoothing and mixed precision.
+
+**D-40: Weighted-loss reduction (I-5).** The class-weighted cross-entropy of `D-24` is computed as PyTorch's standard weighted cross-entropy with `reduction = "mean"`. Each batch's loss is the weighted sum of the per-video losses divided by the sum of the weights of the videos in that batch.
+
+**D-41: Stage A C2 evaluation by deterministic rerun (I-6).**
+- **During Stage A:** the SHA-256 of the model state is recorded at every five-epoch evaluation point of every C1 run. No checkpoint needs to be kept.
+- **After selection:** the selected configuration is retrained to the selected epoch *E* for each of the three seeds. Each rerun must reproduce **exactly** the recorded state hash at *E* and the recorded ground-truth validation macro-F1 at *E*. Only then are the rerun models evaluated on estimated validation poses, giving the descriptive C2 result (Section 9.5.5).
+- **If a rerun does not reproduce exactly,** the work stops. The cause is investigated before anything further is run.
+- **Commit order:** the Stage A selection record is **committed to Git before any C2 or C3 descriptive evaluation** is run. This provides time-stamped evidence that neither result could have influenced selection (`D-13`).
+
+**D-42: Storage of experiment outputs (I-7).**
+- **Outside Git:** experiment outputs are stored under `C:\datasets\penn-action\experiments\release1\`, alongside the dataset. They include per-run logs, per-epoch metrics, per-video predictions, state hashes and the Stage B model checkpoints. Each output folder has a SHA-256 manifest and is protected against overwriting.
+- **In Git:**
+  - the experiment configuration;
+  - the Stage A selection record and the frozen Stage B configuration (Section 9.5.7);
+  - aggregate tables;
+  - compact provenance records that anchor each output folder's manifest hash.
+- **Never committed:** derived pose data, per-video predictions and model weights (Section 13).
+
+**D-43: C3 Stage A evaluation epoch (G-1).** In Stage A, C3 models are trained with the frozen settings for exactly *E* epochs and evaluated on estimated validation poses **only at *E***. They are not evaluated at the other five-epoch points.
+
+**D-44: Ties and random-number streams (G-2).**
+- **Ties:** a tie in the `D-22` selection rule means **exact equality of the unrounded float64 mean macro-F1 values**.
+- **Random-number streams:** separate seeded random-number streams are used for weight initialisation, data ordering and the other stochastic operations (dropout). Evaluation passes therefore never alter the training random-number sequence.
+- **Matched seeds:** with the same seed, comparable C1 and C3 runs start from **identical initial model states** and use **identical data ordering**. Their training videos are in the same identifier order, so only the pose source differs (Section 9.5.6). This is verified by tests.
+
+**D-45: Bootstrap seed value (G-3) [OPEN].** The bootstrap of Section 10.7 is implemented with its seed as a configurable parameter. The **value** of the seed is not yet chosen. It must be fixed and committed to Git **before any test-partition output is opened** (Batch E).
+
 ---
 
 ## 10. Evaluation metrics and statistical analysis
@@ -932,6 +999,7 @@ Test labels and test pose outputs are read **only** by the final evaluation step
 - **Primary metric:** macro-averaged F1 over the 15 classes. It is chosen because it weights each class equally regardless of class frequency.
 - **Secondary metric:** accuracy.
 - Both metrics are computed at the **video level**: one prediction per test video.
+- *Clarified in v0.14 (`D-37`, Section 9.5.8):* macro-F1 always averages over the fixed set of all 15 classes, and a class that is never predicted scores F1 = 0 (`zero_division = 0`). Accuracy is the ordinary proportion correct.
 
 ### 10.2 Training seeds **[ESTABLISHED / PROPOSED]**
 
@@ -996,7 +1064,7 @@ For C4, corruption-draw variability (Section 7.4) is a third source. It is repor
 
 Each is reported as a paired difference in macro-F1 with a 95% interval. Because there are two planned comparisons, Bonferroni-adjusted 97.5% intervals are also reported. Conclusions rest on effect sizes and intervals, not on significance tests. Accuracy, per-class results, per-joint pose error and H6 are secondary or exploratory, with no multiplicity adjustment. The majority-class baseline is reported descriptively as a floor.
 
-**Bootstrap (`D-26`).** The paired, class-stratified video-level bootstrap of Section 10.3, with **B = 10,000** resamples drawn from a fixed, recorded seed. The **same** resampled video identifiers are used for every condition and seed within a comparison.
+**Bootstrap (`D-26`).** The paired, class-stratified video-level bootstrap of Section 10.3, with **B = 10,000** resamples drawn from a fixed, recorded seed. The **same** resampled video identifiers are used for every condition and seed within a comparison. *(v0.14:)* the seed is a configurable parameter. Its value is still open (`D-45`), and it must be fixed and committed before any test-partition output is opened.
 
 **Intervals (`D-27`).** Percentile intervals.
 
@@ -1051,11 +1119,23 @@ Proposed repository locations, consistent with the existing structure:
 - model checkpoints in `checkpoints/` (not committed to Git);
 - aggregated tables and figures in `results/tables/` and `results/figures/`.
 
-### 11.3 Determinism **[PROPOSED]**
+*Superseded in part for Release 1.0 (v0.14, `D-42`, Section 9.5.8):*
+- **Outside the repository:** run records, logs, per-video predictions, state hashes and model checkpoints are stored under `C:\datasets\penn-action\experiments\release1\`, with SHA-256 manifests and overwrite protection.
+- **In Git:** configurations, selection and freeze records, aggregate tables and compact provenance records.
+
+Every run also records the device and the PyTorch, CUDA, cuDNN, NumPy, SciPy and scikit-learn versions (`D-36`).
+
+### 11.3 Determinism (general proposal; Release 1.0 governed by D-36)
 
 - Seed all random number generators: Python, NumPy, PyTorch and scikit-learn.
 - Record whether deterministic GPU algorithms were enabled.
 - Acknowledge that complete bit-for-bit GPU determinism may not be achievable. Seed repetition (Section 10.2) is the primary safeguard.
+
+*Superseded for Release 1.0 (v0.14, `D-36`, Section 9.5.8) **[ESTABLISHED]**:*
+- **Settings:** deterministic algorithms are required, with FP32, cuDNN deterministic, benchmark off, TF32 off and `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
+- **Qualification:** before Stage A, the device must pass a repeated short training run with bit-identical state hashes and training-only metrics; no validation or test metric is computed or inspected. If the GPU fails, the CPU with one thread is tested the same way. If both fail, the work stops.
+- **One device:** the qualified device is used unchanged in every stage and condition.
+- **Seed repetition** remains the safeguard for training variability. Determinism makes each individual run exactly reproducible.
 
 ### 11.4 Protocol versioning **[PROPOSED]**
 
@@ -1120,6 +1200,15 @@ This protocol is version-controlled. Any change after experiments begin is recor
 
 | ID | Topic | Resolution |
 |---|---|---|
+| D-36 *(v0.14, clarification)* | Training device and determinism | FP32; `torch.use_deterministic_algorithms(True)`; cuDNN deterministic on, benchmark off; TF32 off; `CUBLAS_WORKSPACE_CONFIG=:4096:8`; no data-loading worker processes. GPU preferred. **Before Stage A**, the device must pass a short repeated training run (at least five epochs; fitting-subset inputs only) with bit-identical model-state SHA-256 and training-only metrics (for example per-epoch training loss and training accuracy); no validation or test metric is computed or inspected. If the GPU fails, the CPU with one thread is qualified the same way; if that also fails, work stops. The qualified device is fixed before Stage A and never changes between stages or conditions, including the final evaluation. Device and PyTorch, CUDA, cuDNN, NumPy, SciPy and scikit-learn versions are recorded for every run. Supersedes the **[PROPOSED]** Section 11.3 for Release 1.0 (Section 9.5.8). |
+| D-37 *(v0.14, clarification)* | Macro-F1 convention | Macro-F1 averages over all 15 classes, always using the fixed label set 0–14; a never-predicted class scores F1 = 0 (`zero_division = 0`); accuracy is the ordinary proportion correct; computed per video. Used for selection, descriptive results and the bootstrap. Clarifies Section 10.1 without changing it (Section 9.5.8). |
+| D-38 *(v0.14, implementation convention)* | Last partial batch | `drop_last = False`: every training video is used in every epoch (34 steps per epoch in Stage A, 40 in Stage B) (Section 9.5.8). |
+| D-39 *(v0.14, implementation convention)* | Initialisation, optimiser and normalisation defaults | PyTorch default initialisation and BatchNorm settings (inference mode for evaluation); AdamW defaults apart from the `D-22` learning rate and weight decay; weight decay on all parameters, including biases and BatchNorm parameters; no gradient clipping, warm-up, learning-rate schedule, label smoothing or mixed precision (Section 9.5.8). |
+| D-40 *(v0.14, implementation convention)* | Weighted-loss reduction | Standard weighted cross-entropy with `reduction = "mean"`: per batch, the weighted sum of losses divided by the sum of the batch's weights. Implements `D-24` without changing its weights (Section 9.5.8). |
+| D-41 *(v0.14, clarification)* | Stage A C2 evaluation and commit order | Model-state SHA-256 recorded at every five-epoch point of every C1 Stage A run. The C2 descriptive result comes from deterministic reruns of the selected configuration to *E* for each seed, which must reproduce the recorded state hash and ground-truth validation macro-F1 at *E* exactly; otherwise work stops. The selection record is committed to Git before any C2 or C3 descriptive evaluation. Clarifies Sections 9.5.5 and 9.5.7 (Section 9.5.8). |
+| D-42 *(v0.14, implementation convention)* | Storage of experiment outputs | Outputs (logs, per-epoch metrics, per-video predictions, state hashes, Stage B checkpoints) under `C:\datasets\penn-action\experiments\release1\`, outside Git, with SHA-256 manifests and overwrite protection. Committed: configurations, selection and freeze records, aggregate tables and compact provenance records anchoring each output manifest. Supersedes part of the **[PROPOSED]** Section 11.2 for Release 1.0 (Section 9.5.8). |
+| D-43 *(v0.14, clarification)* | C3 Stage A evaluation epoch | C3 Stage A models are trained for exactly *E* epochs and evaluated on estimated validation poses only at *E* (Section 9.5.8). |
+| D-44 *(v0.14, clarification)* | Ties and random-number streams | A `D-22` tie means exact equality of unrounded float64 mean macro-F1 values. Separate seeded random-number streams for initialisation, data ordering and other stochastic operations (dropout). Matched seeds give comparable C1 and C3 runs identical initial model states and identical data ordering, verified by tests (Section 9.5.8). |
 | D-34b *(v0.13)* | RTMPose invalid keypoints: fallback imputation | Steps 2–4 **retained unchanged as pre-specified safety fallbacks**: step 2, when a keypoint is never valid in the video, copy the partner's estimated track only if it contains usable estimates after step 1 (at least one valid estimate); step 3, if the partner track is also entirely invalid, the per-video mean of the original valid estimated primary-keypoint observations (x and y averaged over valid joint-frame observations, before any imputation); step 4, if no primary keypoint is valid anywhere in the video, the image centre (video flagged, retained, reported). No ground-truth coordinates, visibility or box centres. **Evidence (E1, fitting subset only):** 20 of 885,516 primary keypoint observations invalid, in 7 videos; all handled by D-34a step 1; no video required steps 2–4. The complete four-step rule is frozen before any test-partition inference; test-partition E1 results are descriptive only and cannot change preprocessing (Sections 4.3, 5.5.4). |
 | D-35 *(v0.11)* | Release 1.0 scope | Release 1.0 runs **C1, C2 and C3**, with one temporal CNN as the primary learned model plus a majority-class baseline, three seeds, paired video-level bootstrap intervals, pose-error analysis and per-class analysis. C4, C5, the residual bank, artificial corruption, logistic regression, random forest, H3–H5, S1, the head analysis and condition-specific tuning are **deferred, not removed**. Fixed before any pose inference, training or result. The research question, the C1–C5 definitions and all earlier resolved decisions are unchanged (Section 1.4). |
 | D-03 *(v0.11)* | RTMPose variant | **RTMPose-M**, 256 × 192; configuration and checkpoint SHA-256 values as recorded in Section 5.1 and `docs/POSE_ESTIMATION_SETUP.md`. Rationale: a mid-sized official checkpoint, chosen before any Penn Action inference, that runs on the project's 8 GB GPU and is a standard top-down estimator. Other sizes were not evaluated; not tuned on Penn Action. Licensing remains D-30. |
@@ -1159,6 +1248,7 @@ This protocol is version-controlled. Any change after experiments begin is recor
 | D-30 | Estimator licensing | Record the RTMPose/MMPose code and weight licences. |
 | D-31 | Repository licence | Choose a licence for this repository's code. |
 | D-32 | Figures | Whether dataset frames may appear in published figures. |
+| D-45 *(v0.14)* | Bootstrap seed value | The bootstrap (Section 10.7, `D-26`) is implemented with its seed as a configurable parameter. The value must be fixed and committed to Git **before any test-partition output is opened** (Batch E). Not needed for Stage A or Stage B (Section 9.5.8). |
 
 ### 14.3 Deferred to a later release **[DEFERRED]** (v0.11)
 
