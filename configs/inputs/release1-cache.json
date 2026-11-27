@@ -1,0 +1,16 @@
+{
+  "description": "Durable record of the accepted Batch D1 recogniser-input cache (training partition only). scripts/build_inputs.py --verify checks the default cache against this record.",
+  "cache_dir": "C:\\datasets\\penn-action\\inputs\\release1",
+  "built": "2026-11-27T13:27:39 (local time, recorded without a time zone by the original build)",
+  "built_from_commit": "45399c8644b26567c98d7143cae63213df23ace1",
+  "built_with_uncommitted_changes": true,
+  "provenance_note": "Built before the D1 files were committed; build_report.json records the SHA-256 of every source file used. The later D1 hardening pass changed scripts/build_inputs.py and src/penn_pose/temporal.py without changing any input array.",
+  "manifest": "inputs-sha256.txt",
+  "manifest_sha256": "2ab40e9263a903def05a1975ab1be659e40ad9532fc0ab8dff4d7564b2ae8e55",
+  "files": {
+    "gt_train.npz": "d091bf73d1b7f0f20e8a9d4cd9fd6a926c24192c6c8622ec47317d26a645f35f",
+    "est_train.npz": "660cbada9ffec353723cfeb1d15eb4075311b4a60311dceadbfd55983244f97c",
+    "class_map.json": "8f504afeab306a9ea9e264326c280136f2cc23b410bfc68fe49dbd3256c9a8fc",
+    "build_report.json": "a1c84a9cbcbb5029cbc2a7e13dd5cf6ee5440a880b5340958a7ad7cbc8130509"
+  }
+}
