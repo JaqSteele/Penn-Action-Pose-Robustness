@@ -1,0 +1,115 @@
+{
+  "description": "Release 1.0 recogniser experiment configuration (protocol v0.14, Sections 9.5 and 9.5.8).",
+  "protocol": "v0.14",
+  "plan": {
+    "grid": [
+      {
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.1
+      },
+      {
+        "learning_rate": 0.001,
+        "weight_decay": 0.0001,
+        "dropout": 0.3
+      },
+      {
+        "learning_rate": 0.001,
+        "weight_decay": 0.001,
+        "dropout": 0.1
+      },
+      {
+        "learning_rate": 0.001,
+        "weight_decay": 0.001,
+        "dropout": 0.3
+      },
+      {
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "dropout": 0.1
+      },
+      {
+        "learning_rate": 0.003,
+        "weight_decay": 0.0001,
+        "dropout": 0.3
+      },
+      {
+        "learning_rate": 0.003,
+        "weight_decay": 0.001,
+        "dropout": 0.1
+      },
+      {
+        "learning_rate": 0.003,
+        "weight_decay": 0.001,
+        "dropout": 0.3
+      }
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "max_epochs": 150,
+    "eval_every": 5,
+    "eval_epochs": [
+      5,
+      10,
+      15,
+      20,
+      25,
+      30,
+      35,
+      40,
+      45,
+      50,
+      55,
+      60,
+      65,
+      70,
+      75,
+      80,
+      85,
+      90,
+      95,
+      100,
+      105,
+      110,
+      115,
+      120,
+      125,
+      130,
+      135,
+      140,
+      145,
+      150
+    ]
+  },
+  "batch_size": 32,
+  "drop_last": false,
+  "optimizer": "AdamW; defaults apart from learning rate and weight decay; weight decay on all parameters",
+  "loss": "class-weighted cross-entropy, w_c = N / (K N_c) from the run's training labels, reduction='mean'",
+  "device_policy": {
+    "candidates": [
+      "cuda:0",
+      "cpu"
+    ],
+    "cpu_threads": 1
+  },
+  "qualification": {
+    "epochs": 5,
+    "config": {
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "dropout": 0.3
+    },
+    "seed": 0,
+    "inputs": "ground-truth fitting subset; training-only metrics"
+  },
+  "bootstrap": {
+    "n_resamples": 10000,
+    "seed": null,
+    "seed_status": "open (D-45): fixed and committed before any test-partition output is opened"
+  },
+  "experiment_root": "C:\\datasets\\penn-action\\experiments\\release1",
+  "inputs_record": "configs/inputs/release1-cache.json"
+}

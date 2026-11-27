@@ -84,3 +84,117 @@ Verification checks:
 - 1,258 videos (1,070 fitting / 188 validation) for each source; `X` has shape `(1258, 24, 64)`.
 - **Ground-truth repair:** 14 partly-placeholder tracks, 601 partner copies, 494 `c_v` fallbacks and 78,166 placeholder points. These match protocol Section 5.5.3.
 - **Imputation:** 20 observations by step 1, in videos 0359, 0362, 0373, 0462, 0710, 1516 and 1905; 0 by steps 2–4. This reproduces E1: 20 in the fitting subset and 0 in the validation subset.
+
+---
+
+# Recogniser and experiment infrastructure (Batch D2)
+
+Batch D2 implements the Release 1.0 recogniser, training, metrics, selection, bootstrap and experiment management (protocol v0.14, Sections 9.5, 9.5.8 and 10.7; D-36 to D-45). **Nothing in D2 has been run on Penn Action data:**
+- the device qualification has not been run;
+- Stage A and Stage B have not been run;
+- no validation or test metric has been computed.
+
+## Modules
+
+| Module | Contents | Protocol |
+|---|---|---|
+| `src/penn_pose/model.py` | `TemporalCNN` (133,135 parameters); `build_model`, which initialises from the run seed's "init" stream | D-21, D-39, D-44 |
+| `src/penn_pose/determinism.py` | deterministic configuration and checks; stream seeds; model-state SHA-256; environment record and device lock | D-36, D-44 |
+| `src/penn_pose/training.py` | class weights; weighted loss; AdamW; batches; `train_model` with state hashes at checkpoints; inference-mode evaluation | D-24, D-38–D-40, D-44 |
+| `src/penn_pose/metrics.py` | macro-F1 over all 15 classes (never-predicted classes score 0), accuracy, per-class F1, confusion matrix, majority baseline | §10.1, D-37 |
+| `src/penn_pose/selection.py` | the D-22 plan and selection; ties are exact float64 equality | D-22, D-44 |
+| `src/penn_pose/bootstrap.py` | paired, class-stratified bootstrap; percentile intervals; the seed must always be passed explicitly | D-26–D-28, D-45 |
+| `src/penn_pose/runs.py` | write-then-rename run folders, run and stage manifests, records that are never overwritten, the Git commit gate | D-41, D-42 |
+| `src/penn_pose/experiment.py` | qualification, Stage A C1, selection record, C2 reruns, C3, Stage B | §4.4, §9.5, D-36, D-41, D-43 |
+| `scripts/run_release1.py` | command-line interface; every training command needs `--confirm` | — |
+| `configs/recognition/release1.json` | the committed experiment configuration (checked against the code). The bootstrap seed is `null` (D-45) | D-42 |
+
+## Random-number streams (D-44)
+
+- **Stream seeds.** Each run seed (0, 1, 2) yields three stream seeds, derived with SHA-256 from the seed and the stream name ("init", "order", "dropout"). They don't depend on the condition or the hyperparameters.
+- **Initialisation.** Weights are created on the CPU with PyTorch's default initialisation, inside `torch.random.fork_rng`, from the "init" stream.
+- **Batch order.** It comes from a dedicated CPU generator seeded from the "order" stream.
+- **Dropout.** It uses the global generator, seeded from the "dropout" stream at the start of training.
+- **Evaluation.** It runs in inference mode, without gradients and inside `fork_rng`, so it can't change the training sequence.
+- **Matched seeds.** C1 and C3 runs with the same seed therefore have identical initial states and batch orders (tested).
+
+## Order of operations (one command each, each needing separate approval)
+
+1. `qualify`:
+   - runs two repetitions, each in a fresh process, of a 5-epoch run on ground-truth fitting inputs;
+   - compares the state hashes and training-only metrics exactly, with no validation or test data;
+   - tries the GPU first, then the CPU with one thread, and otherwise stops;
+   - writes the full qualification run outside Git and the compact record `configs/recognition/release1-device.json`, **which must be committed before Stage A**.
+2. `stage-a-c1`: 24 runs, with ground-truth validation macro-F1 and the state hash at epochs 5–150. It resumes safely: finished runs are verified (manifest and provenance) and skipped.
+3. `select`: writes `configs/recognition/release1-selection.json` (the selection and freeze record) and `results/tables/release1_stage_a_c1_validation.csv`. **The record must be committed before steps 4–6** (D-41; enforced in code).
+4. `stage-a-c2`: reruns the selected configuration to E for every seed. Each rerun must reproduce the recorded state hash and validation macro-F1 exactly before any estimated-pose evaluation.
+5. `stage-a-c3`: trains on estimated fitting inputs for E epochs and evaluates only at E (D-43).
+6. `stage-b`: trains the frozen C1 models (shared with C2) and C3 models on all 1,258 videos, computes no metric, and saves the model weights outside Git. `experiment.load_stage_b_models` reloads them and verifies every manifest and state hash, for the separate final evaluation in Batch E (not implemented in D2; it needs the test-partition inputs, D-01 and the D-45 seed).
+
+Every command after `qualify` loads the committed device record and refuses to run if the device, GPU name, PyTorch, CUDA or cuDNN version differs. Outputs go to `C:\datasets\penn-action\experiments\release1\`, with a SHA-256 manifest per run and per stage. Git receives only the configuration, the compact records in `configs/recognition/` (`release1-device.json`, `release1-selection.json`, `release1-stage-a-c2.json`, `release1-stage-a-c3.json`, `release1-stage-b.json`) and the aggregate table in `results/tables/`. Every writer refuses an output root inside the repository.
+
+## Provenance and code identity
+
+These checks implement D-36 (one qualified device and its software throughout), D-41 (exact reruns, and the selection record committed before any C2, C3 or Stage B step) and §9.5.7 (the code commit recorded before Stage B). They add no methodological decision.
+
+**Protected scope.** The files that determine what an experiment computes (`runs.PROTECTED_PATHS`):
+
+| Path | Why it is protected |
+|---|---|
+| `src/` | all implementation code (D1 preprocessing and D2) |
+| `scripts/` | the command-line entry points |
+| `configs/recognition/release1.json` | the experiment configuration (D-42) |
+| `configs/inputs/release1-cache.json` | the recorded D1 input-cache hashes |
+| `configs/splits/` | the D-02 fitting and validation lists |
+| `requirements.txt` | the main-environment dependency specification |
+| `docs/RESEARCH_PROTOCOL.md` | the authoritative research protocol (v0.14) that the experiment follows |
+
+This list is canonical. Provenance must record exactly this list, in this order. A narrowed, extended, reordered or altered list is rejected, and every check recomputes identities from the canonical list rather than from recorded values.
+
+Records (`configs/recognition/release1-*.json`), result tables, explanatory documentation (including this file) and tests are outside the scope. Committing them never changes the code identity, and they may make the rest of the working tree dirty. A committed protocol amendment *does* change the identity. Stage A, selection, C2, C3 and Stage B must therefore all run under the same protocol text.
+
+**Code identity.** `runs.code_identity` refuses unless the protected scope is committed and clean. It reports any of these:
+- a tracked modification;
+- a staged change;
+- an untracked file;
+- an ignored file. Only `__pycache__` bytecode is allowed, because Python uses it only when the matching committed source file exists.
+
+It returns HEAD and the SHA-256 of `git ls-tree -r` for the protected paths at HEAD. Every protected path must exist in that commit. Because the D2 implementation must be committed before this succeeds, no experiment step can run on uncommitted code.
+
+**Required provenance.** `experiment.provenance` records:
+- the protocol version;
+- the environment (`determinism.environment_record`);
+- the Git state;
+- the code identity;
+- the device-record hash;
+- the split hashes;
+- the input-record hash.
+
+Every step (`stage_a_c1`, `select_and_record`, `stage_a_c2`, `stage_a_c3`, `stage_b`) requires it. `validate_provenance` refuses provenance in any of these cases:
+- it is missing or incomplete;
+- a locked environment field is missing, null or malformed. `device` must be a CPU or CUDA device matching `device_type`; `device_name`, `torch` and `cuda` must be non-empty strings; `cudnn` must be a positive integer;
+- `device_record_sha256`, `inputs_record_sha256`, the two split hashes (exactly the keys `fitting` and `validation`) or the protected-tree hash is not a 64-character hexadecimal SHA-256, in either case;
+- its protected paths are not the canonical list;
+- its code identity doesn't describe the repository as it is now.
+
+**Locked fields** (`check_provenance`):
+- the protocol version, the device-record hash, the split hashes and the input-record hash;
+- the environment fields in `determinism.LOCKED_FIELDS`: device, device type, device name, PyTorch, CUDA and cuDNN;
+- the protected paths and protected-tree hash.
+
+The NumPy, SciPy, scikit-learn and Python versions and the overall dirty flag are recorded but not locked.
+
+**How it applies at each step:**
+
+| Step | Rule |
+|---|---|
+| Stage A C1 | Before anything new is trained, every finished run (including resumed runs) must match the current provenance **with the same implementation commit**. Provenance is re-validated before each new run is written. A mismatching run stops the stage and is never rewritten. |
+| Selection | Every Stage A run must match the current provenance with the same commit, so no commit may be made between Stage A and `select`. The selection record stores the Stage A implementation (`stage_a_implementation`: commit, protected paths, protected-tree hash). |
+| C2, C3, Stage B | The current provenance must match the selection record's. The Stage A commit must be an ancestor of HEAD, and the protected-tree hash at that commit must equal the recorded one and the current one. Record commits (such as the committed selection record) are therefore allowed, while any committed, staged, uncommitted or untracked change in the protected scope is refused. Provenance is re-validated before each run is written. |
+
+
+**Training-only metrics.** The per-epoch training loss is the epoch-level class-weighted mean of the per-video losses, sum(w_i l_i) / sum(w_i), so the smaller last batch counts by its weight. The training accuracy is the proportion of training videos whose training-mode prediction was correct during the epoch. These metrics are logged and compared in the qualification; selection never uses them.
+
+## Known behaviour
+
+On a machine with a visible CUDA GPU, the first `AdamW.step()` initialises a CUDA context, even when every tensor is on the CPU. The call chain is `torch/optim/adam.py` `step` → `Optimizer._accelerator_graph_capture_health_check` → `torch.accelerator.current_stream().is_capturing()`. This doesn't change CPU results. `CUBLAS_WORKSPACE_CONFIG` is set when `penn_pose.determinism` is imported, before `torch` is first imported (tested in a fresh interpreter). Each qualification repetition, including the CPU fallback, runs in a new Python process, which applies `determinism.configure` before training.
