@@ -103,11 +103,24 @@ Batch D2 implements the Release 1.0 recogniser, training, metrics, selection, bo
 | `src/penn_pose/training.py` | class weights; weighted loss; AdamW; batches; `train_model` with state hashes at checkpoints; inference-mode evaluation | D-24, D-38–D-40, D-44 |
 | `src/penn_pose/metrics.py` | macro-F1 over all 15 classes (never-predicted classes score 0), accuracy, per-class F1, confusion matrix, majority baseline | §10.1, D-37 |
 | `src/penn_pose/selection.py` | the D-22 plan and selection; ties are exact float64 equality | D-22, D-44 |
-| `src/penn_pose/bootstrap.py` | paired, class-stratified bootstrap; percentile intervals; the seed must always be passed explicitly | D-26–D-28, D-45 |
+| `src/penn_pose/bootstrap.py` | paired, class-stratified bootstrap; percentile intervals with explicit linear interpolation; sample SD of the seed differences; the seed must always be passed explicitly (settings below) | D-26–D-28, D-45–D-47 |
 | `src/penn_pose/runs.py` | write-then-rename run folders, run and stage manifests, records that are never overwritten, the Git commit gate | D-41, D-42 |
 | `src/penn_pose/experiment.py` | qualification, Stage A C1, selection record, C2 reruns, C3, Stage B | §4.4, §9.5, D-36, D-41, D-43 |
 | `scripts/run_release1.py` | command-line interface; every training command needs `--confirm` | — |
-| `configs/recognition/release1.json` | the committed experiment configuration (checked against the code). The bootstrap seed is `null` (D-45) | D-42 |
+| `configs/recognition/release1.json` | the committed experiment configuration (checked against the code), including the bootstrap settings below | D-42, D-45–D-47 |
+
+## Final-evaluation bootstrap settings (protocol v0.15)
+
+These are the settings in `configs/recognition/release1.json` (`"bootstrap"`) and `bootstrap.py`, fixed in protocol v0.15 (Sections 9.5.9 and 10.7) after Stage B and before any test-partition output existed. A test checks this table against the configuration.
+
+| Setting | Value | Decision |
+|---|---|---|
+| Resamples (B) | `10000` | D-26 |
+| Seed | `20261128` | D-45 |
+| Seed-variation standard deviation | sample SD, `ddof=1` | D-46 |
+| Percentile interpolation | `method="linear"` | D-47 |
+
+The bootstrap is paired and class-stratified, with the same resamples for every condition, seed and comparison; intervals are 95% (2.5th and 97.5th percentiles) and Bonferroni-adjusted 97.5% (1.25th and 98.75th). The bootstrap functions have no default seed: the final evaluation passes the configured seed explicitly.
 
 ## Random-number streams (D-44)
 
@@ -129,7 +142,7 @@ Batch D2 implements the Release 1.0 recogniser, training, metrics, selection, bo
 3. `select`: writes `configs/recognition/release1-selection.json` (the selection and freeze record) and `results/tables/release1_stage_a_c1_validation.csv`. **The record must be committed before steps 4–6** (D-41; enforced in code).
 4. `stage-a-c2`: reruns the selected configuration to E for every seed. Each rerun must reproduce the recorded state hash and validation macro-F1 exactly before any estimated-pose evaluation.
 5. `stage-a-c3`: trains on estimated fitting inputs for E epochs and evaluates only at E (D-43).
-6. `stage-b`: trains the frozen C1 models (shared with C2) and C3 models on all 1,258 videos, computes no metric, and saves the model weights outside Git. `experiment.load_stage_b_models` reloads them and verifies every manifest and state hash, for the separate final evaluation in Batch E (not implemented in D2; it needs the test-partition inputs, D-01 and the D-45 seed).
+6. `stage-b`: trains the frozen C1 models (shared with C2) and C3 models on all 1,258 videos, computes no metric, and saves the model weights outside Git. `experiment.load_stage_b_models` reloads them and verifies every manifest and state hash, for the separate final evaluation in Batch E (not implemented in D2; it needs the test-partition inputs and D-01; the D-45 seed is fixed in protocol v0.15).
 
 Every command after `qualify` loads the committed device record and refuses to run if the device, GPU name, PyTorch, CUDA or cuDNN version differs. Outputs go to `C:\datasets\penn-action\experiments\release1\`, with a SHA-256 manifest per run and per stage. Git receives only the configuration, the compact records in `configs/recognition/` (`release1-device.json`, `release1-selection.json`, `release1-stage-a-c2.json`, `release1-stage-a-c3.json`, `release1-stage-b.json`) and the aggregate table in `results/tables/`. Every writer refuses an output root inside the repository.
 

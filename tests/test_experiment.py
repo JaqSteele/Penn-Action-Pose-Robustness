@@ -166,16 +166,19 @@ class TestEndToEnd(unittest.TestCase):
         self.assertEqual([e["order_sha256"] for e in c1_0["training_metrics"]],
                          [e["order_sha256"] for e in c3_0["training_metrics"]])
         self.assertEqual(set(b["conditions"]), {"C1", "C3"})
-        models = ex.load_stage_b_models(self.out, b, DEVICE)
+        selection = runs.read_json(self.record_path)
+        models = ex.load_stage_b_models(self.out, b, DEVICE, selection_record=selection, repo_root=self.repo)
         self.assertEqual({k: sorted(v) for k, v in models.items()}, {"C1": [0, 1], "C3": [0, 1]})
         for cond in ("C1", "C3"):
             for seed, m in models[cond].items():
                 self.assertFalse(m.training)
                 self.assertEqual(determinism.state_hash(m), b["conditions"][cond]["final_state_sha256"][str(seed)])
+        with self.assertRaises(TypeError):                               # the selection record is required
+            ex.load_stage_b_models(self.out, b, DEVICE)
         victim = next((self.out / "stage_b_c3").glob("*_seed1")) / "model.pt"
         victim.write_bytes(victim.read_bytes()[:-8] + b"tampered")
         with self.assertRaises(ValueError):
-            ex.load_stage_b_models(self.out, b, DEVICE)
+            ex.load_stage_b_models(self.out, b, DEVICE, selection_record=selection, repo_root=self.repo)
         for name in ("stage-a-c2", "stage-a-c3", "stage-b"):
             self.assertTrue(ex.stage_record_path(self.records, name).is_file())
 
@@ -241,7 +244,8 @@ class TestEndToEnd(unittest.TestCase):
 
 class TestNoTestPartitionAccess(unittest.TestCase):
     D2_FILES = [_common.REPO_ROOT / "src" / "penn_pose" / f"{m}.py"
-                for m in ("model", "determinism", "training", "metrics", "selection", "bootstrap", "runs", "experiment")]
+                for m in ("model", "determinism", "training", "metrics", "selection", "bootstrap", "runs", "experiment",
+                          "batch_e")]
     D2_FILES.append(_common.REPO_ROOT / "scripts" / "run_release1.py")
 
     def test_static(self):
@@ -286,7 +290,13 @@ class TestDeviceLockAndConfig(unittest.TestCase):
 
     def test_committed_config_matches_code(self):
         cfg = ex.load_config()
-        self.assertIsNone(cfg["bootstrap"]["seed"])                     # D-45 still open
+        self.assertEqual(cfg["bootstrap"], {                             # D-45 resolved, D-46, D-47 (v0.15)
+            "n_resamples": 10000, "seed": 20261128, "sd_ddof": 1, "percentile_method": "linear",
+            "seed_status": "fixed (D-45, protocol v0.15) after Stage B and before any test-partition output "
+                           "existed; D-46 sample SD; D-47 linear percentiles"})
+        self.assertIs(type(cfg["bootstrap"]["seed"]), int)
+        self.assertEqual(cfg["protocol"], ex.PROTOCOL_VERSION)
+        self.assertEqual(ex.PROTOCOL_VERSION, "v0.15")
         self.assertEqual(cfg["plan"]["eval_epochs"], list(range(5, 151, 5)))
         with tempfile.TemporaryDirectory() as tmp:
             altered = dict(cfg)

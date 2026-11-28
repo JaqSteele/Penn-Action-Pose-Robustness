@@ -1,6 +1,6 @@
 {
-  "description": "Release 1.0 recogniser experiment configuration (protocol v0.14, Sections 9.5 and 9.5.8).",
-  "protocol": "v0.14",
+  "description": "Release 1.0 recogniser experiment configuration (protocol v0.15, Sections 9.5, 9.5.8 and 9.5.9).",
+  "protocol": "v0.15",
   "plan": {
     "grid": [
       {
@@ -107,8 +107,10 @@
   },
   "bootstrap": {
     "n_resamples": 10000,
-    "seed": null,
-    "seed_status": "open (D-45): fixed and committed before any test-partition output is opened"
+    "seed": 20261128,
+    "sd_ddof": 1,
+    "percentile_method": "linear",
+    "seed_status": "fixed (D-45, protocol v0.15) after Stage B and before any test-partition output existed; D-46 sample SD; D-47 linear percentiles"
   },
   "experiment_root": "C:\\datasets\\penn-action\\experiments\\release1",
   "inputs_record": "configs/inputs/release1-cache.json"

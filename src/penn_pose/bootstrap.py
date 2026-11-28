@@ -1,17 +1,19 @@
-"""Paired, class-stratified video-level bootstrap (protocol Sections 10.3, 10.7; D-26, D-27, D-28,
-D-37, D-45).
+"""Paired, class-stratified video-level bootstrap (protocol Sections 9.5.9, 10.3, 10.7; D-26, D-27,
+D-28, D-37, D-45, D-46, D-47).
 
 - Resampling: within each class, videos are drawn with replacement, keeping each class's count.
-  The same resampled indices are used for every condition and seed within a comparison.
-- B = 10,000 resamples (D-26). Percentile intervals (D-27), computed with ``numpy.percentile``
-  (default linear interpolation).
+  The same resampled indices are used for every condition and seed within a comparison: they are a
+  deterministic function of the seed, B and the ordered labels.
+- B = 10,000 resamples (D-26). Percentile intervals (D-27) with linear interpolation between order
+  statistics, stated explicitly: ``numpy.percentile(..., method=PERCENTILE_METHOD)`` (D-47).
 - Comparison A versus B with three seeds (Section 10.7): point estimate = mean over seeds of the
   per-seed macro-F1 differences on the full set; 95% interval = 2.5th and 97.5th percentiles of the
   seed-averaged difference over resamples; Bonferroni 97.5% interval = 1.25th and 98.75th.
-  Seed variation is reported separately: the per-seed differences, their range and standard
-  deviation, and each seed's own bootstrap interval.
-- D-45: the bootstrap seed has **no default**. Its value is still open and must be fixed and
-  committed before any test-partition output is opened; it is always passed explicitly.
+  Seed variation is reported separately: the per-seed differences, their range, their sample
+  standard deviation (``ddof=SD_DDOF``, D-46) and each seed's own bootstrap interval.
+- D-45: the Release 1.0 bootstrap seed is 20261128, recorded in the committed experiment
+  configuration (``configs/recognition/release1.json``). The functions here still have **no
+  default seed**: the caller always passes it explicitly.
 
 Nothing here reads data; it operates on label and prediction arrays given by the caller.
 """
@@ -26,6 +28,10 @@ from . import metrics
 
 N_RESAMPLES = 10_000
 LEVELS = {"ci95": (2.5, 97.5), "ci97_5": (1.25, 98.75)}
+#: D-47: linear interpolation between order statistics (Hyndman-Fan type 7), never a library default.
+PERCENTILE_METHOD = "linear"
+#: D-46: the seed-variation standard deviation is the sample standard deviation (divisor n - 1).
+SD_DDOF = 1
 
 
 def _check_seed(seed) -> int:
@@ -55,7 +61,8 @@ def _check_preds(y_true: np.ndarray, preds: Mapping[int, np.ndarray]) -> Dict[in
 
 
 def _percentiles(values: np.ndarray) -> dict:
-    return {name: [float(v) for v in np.percentile(values, q)] for name, q in LEVELS.items()}
+    return {name: [float(v) for v in np.percentile(values, q, method=PERCENTILE_METHOD)]
+            for name, q in LEVELS.items()}
 
 
 def paired_comparison(y_true: np.ndarray, preds_a: Mapping[int, np.ndarray], preds_b: Mapping[int, np.ndarray],
@@ -73,12 +80,14 @@ def paired_comparison(y_true: np.ndarray, preds_a: Mapping[int, np.ndarray], pre
     diffs = np.array([per_seed_full[s] for s in a])
     return {
         "metric": "macro_f1", "n_resamples": n_resamples, "bootstrap_seed": int(seed), "seeds": list(a),
+        "percentile_method": PERCENTILE_METHOD,
         "point_estimate": float(np.mean(diffs)),
         **_percentiles(averaged),
         "seed_variation": {
             "per_seed_difference": {str(s): float(per_seed_full[s]) for s in a},
             "range": float(diffs.max() - diffs.min()),
-            "sd": float(np.std(diffs, ddof=1)) if diffs.size > 1 else None,
+            "sd": float(np.std(diffs, ddof=SD_DDOF)) if diffs.size > SD_DDOF else None,
+            "sd_ddof": SD_DDOF,
             "per_seed_ci95": {str(s): _percentiles(per_seed_boot[s])["ci95"] for s in a},
         },
     }
@@ -90,7 +99,8 @@ def condition_summary(y_true: np.ndarray, preds: Mapping[int, np.ndarray], seed,
     y = metrics.check_labels(y_true, "y_true")
     p = _check_preds(y, preds)
     idx = resample_indices(y, n_resamples, seed)
-    out = {"n_resamples": n_resamples, "bootstrap_seed": int(seed), "seeds": list(p)}
+    out = {"n_resamples": n_resamples, "bootstrap_seed": int(seed), "seeds": list(p),
+           "percentile_method": PERCENTILE_METHOD}
     for name, fn in (("macro_f1", metrics.macro_f1), ("accuracy", metrics.accuracy)):
         boot = {s: np.array([fn(y[r], p[s][r]) for r in idx]) for s in p}
         out[name] = {

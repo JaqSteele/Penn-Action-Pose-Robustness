@@ -47,7 +47,7 @@ RECORDS_DIR = REPO_ROOT / "configs" / "recognition"
 TABLES_DIR = REPO_ROOT / "results" / "tables"
 CACHE_DIR = DEFAULT_DATA_ROOT / "inputs" / "release1"
 CACHE_RECORD = REPO_ROOT / "configs" / "inputs" / "release1-cache.json"
-PROTOCOL_VERSION = "v0.14"
+PROTOCOL_VERSION = "v0.15"
 
 DEVICE_CANDIDATES = ("cuda:0", "cpu")
 QUALIFICATION_EPOCHS = 5
@@ -70,7 +70,7 @@ class ReproductionError(RuntimeError):
 def config_dict() -> dict:
     """The committed experiment configuration, as the code defines it."""
     return {
-        "description": "Release 1.0 recogniser experiment configuration (protocol v0.14, Sections 9.5 and 9.5.8).",
+        "description": "Release 1.0 recogniser experiment configuration (protocol v0.15, Sections 9.5, 9.5.8 and 9.5.9).",
         "protocol": PROTOCOL_VERSION,
         "plan": RELEASE1.as_dict(),
         "batch_size": BATCH_SIZE,
@@ -80,8 +80,9 @@ def config_dict() -> dict:
         "device_policy": {"candidates": list(DEVICE_CANDIDATES), "cpu_threads": 1},
         "qualification": {"epochs": QUALIFICATION_EPOCHS, "config": QUALIFICATION_CONFIG.as_dict(),
                           "seed": QUALIFICATION_SEED, "inputs": "ground-truth fitting subset; training-only metrics"},
-        "bootstrap": {"n_resamples": 10000, "seed": None,
-                      "seed_status": "open (D-45): fixed and committed before any test-partition output is opened"},
+        "bootstrap": {"n_resamples": 10000, "seed": 20261128, "sd_ddof": 1, "percentile_method": "linear",
+                      "seed_status": "fixed (D-45, protocol v0.15) after Stage B and before any test-partition "
+                                     "output existed; D-46 sample SD; D-47 linear percentiles"},
         "experiment_root": str(runs.EXPERIMENT_ROOT),
         "inputs_record": "configs/inputs/release1-cache.json",
     }
@@ -719,17 +720,46 @@ def stage_b(gt: Inputs, est: Inputs, device: str, out_root: Path, record_path: P
 # reads or evaluates test data)
 
 
-def load_stage_b_models(out_root: Path, stage_b_record: dict, device: str) -> Dict[str, Dict[int, "object"]]:
-    """Return {"C1": {seed: model}, "C3": {seed: model}} in inference mode, after checking every run
-    manifest, each stage manifest against the Stage B record, and each model's state hash."""
+def load_stage_b_models(out_root: Path, stage_b_record: dict, device: str, *, selection_record: dict,
+                        repo_root: Path) -> Dict[str, Dict[int, "object"]]:
+    """Return {"C1": {seed: model}, "C3": {seed: model}} in inference mode, after checking (v0.15,
+    Section 9.5.9):
+
+    - the Stage B record against the committed selection record (configuration, E, seeds);
+    - every stage manifest against the Stage B record, and every run manifest against its stage
+      manifest (each run holds exactly ``model.pt`` and ``run.json``);
+    - every ``run.json``: stage, condition, training inputs, training-set size, configuration, seed,
+      exactly E epochs of training metrics, no evaluation, no early stopping, final state hash and
+      selection-record commit as recorded;
+    - every run's provenance: complete, well formed and consistent with the selection record
+      (ancestor commit, identical protected tree, protocol, device, split and input records,
+      locked environment);
+    - matched seeds: C1 and C3 runs with the same seed have identical initial states and batch orders;
+    - each loaded model's state hash against the Stage B record.
+
+    Any mismatch raises ``ValueError`` (or ``ProvenanceError``) before a model is returned."""
     import torch
     from .model import TemporalCNN
 
+    expected_inputs = {"C1": "gt all training videos", "C3": "est all training videos"}
+    sel_b = selection_record["stage_b"]
+    selected_config, selected_E = _selected(selection_record)
     c = stage_b_record["config"]
     config = TrainConfig(c["learning_rate"], c["weight_decay"], c["dropout"])
     E = int(stage_b_record["epochs"])
+    if stage_b_record.get("stage") != "B" or config != selected_config or c != sel_b["config"]:
+        raise ValueError("Stage B record configuration differs from the selection record")
+    if E != selected_E or E != int(sel_b["epochs"]) or isinstance(stage_b_record["epochs"], bool):
+        raise ValueError("Stage B record epoch count differs from the selection record")
+    if set(stage_b_record["conditions"]) != set(expected_inputs):
+        raise ValueError(f"Stage B record must cover exactly {sorted(expected_inputs)}")
+    seeds = [str(s) for s in sel_b["seeds"]]
+    commit = stage_b_record["selection_record_commit"]
     models: Dict[str, Dict[int, object]] = {}
-    for condition, rec in stage_b_record["conditions"].items():
+    initial: Dict[str, Dict[str, tuple]] = {}
+    for condition, rec in sorted(stage_b_record["conditions"].items()):
+        if sorted(rec["final_state_sha256"]) != sorted(seeds):
+            raise ValueError(f"{condition}: Stage B seeds {sorted(rec['final_state_sha256'])} differ from {seeds}")
         stage_dir = Path(out_root) / f"stage_b_{condition.lower()}"
         if integrity.sha256_file(stage_dir / "stage-sha256.txt") != rec["stage_manifest_sha256"]:
             raise ValueError(f"{stage_dir}: stage manifest differs from the Stage B record")
@@ -737,13 +767,50 @@ def load_stage_b_models(out_root: Path, stage_b_record: dict, device: str) -> Di
         listed = integrity.read_manifest(stage_dir / "stage-sha256.txt")
         if {k.split("/")[0]: v for k, v in listed.items()} != done:
             raise ValueError(f"{stage_dir}: run manifests differ from the stage manifest")
+        if sorted(done) != sorted(f"{config.name}_E{E}_seed{s}" for s in seeds):
+            raise ValueError(f"{stage_dir}: runs {sorted(done)} differ from the expected runs")
         models[condition] = {}
-        for seed_text, want in rec["final_state_sha256"].items():
+        initial[condition] = {}
+        for seed_text, want in sorted(rec["final_state_sha256"].items()):
             run_dir = stage_dir / f"{config.name}_E{E}_seed{seed_text}"
+            if set(integrity.read_manifest(run_dir / runs.RUN_MANIFEST)) != {"model.pt", "run.json"}:
+                raise ValueError(f"{run_dir}: a Stage B run must hold exactly model.pt and run.json")
+            run = runs.read_json(run_dir / "run.json")
+            metrics_ = run.get("training_metrics")
+            problems = [k for k, ok in (
+                ("stage", run.get("stage") == "B"),
+                ("condition", run.get("condition") == condition),
+                ("train_inputs", run.get("train_inputs") == expected_inputs[condition]),
+                ("training_videos", run.get("training_videos") == sel_b["training_videos"]),
+                ("config", run.get("config") == config.as_dict()),
+                ("epochs", run.get("epochs") == E and not isinstance(run.get("epochs"), bool)),
+                ("seed", run.get("seed") == int(seed_text) and not isinstance(run.get("seed"), bool)),
+                ("early_stopping", run.get("early_stopping") is False),
+                ("evaluation", "evaluation" in run and run["evaluation"] is None),
+                ("training_metrics", isinstance(metrics_, list)
+                 and [m.get("epoch") for m in metrics_] == list(range(1, E + 1))),
+                ("final_state_sha256", run.get("final_state_sha256") == want),
+                ("selection_record_commit", run.get("selection_record_commit") == commit),
+            ) if not ok]
+            if problems:
+                raise ValueError(f"{run_dir}: run record differs from the Stage B record: {problems}")
+            prov = run.get("provenance")
+            if not isinstance(prov, dict) or [k for k in REQUIRED_PROVENANCE if k not in prov]:
+                raise ProvenanceError(f"{run_dir}: provenance is missing or incomplete")
+            field_problems = provenance_field_problems(prov)
+            if field_problems:
+                raise ProvenanceError(f"{run_dir}: provenance is invalid: {field_problems}")
+            if prov["code"]["commit"] != commit or prov["git"].get("commit") != commit:
+                raise ProvenanceError(f"{run_dir}: provenance commit differs from the Stage B record")
+            check_provenance(selection_record.get("provenance"), prov, repo_root, same_commit=False)
+            initial[condition][seed_text] = (run.get("initial_state_sha256"),
+                                             [m.get("order_sha256") for m in metrics_])
             state = torch.load(run_dir / "model.pt", map_location="cpu", weights_only=True)
             model = TemporalCNN(config.dropout)
             model.load_state_dict(state)
             if determinism.state_hash(model) != want:
                 raise ValueError(f"{run_dir}: model state differs from the Stage B record")
             models[condition][int(seed_text)] = model.to(device).eval()
+    if initial["C1"] != initial["C3"]:
+        raise ValueError("C1 and C3 Stage B runs with the same seed must share initial states and batch orders")
     return models
