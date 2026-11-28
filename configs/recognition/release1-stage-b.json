@@ -1,0 +1,32 @@
+{
+  "stage": "B",
+  "config": {
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "dropout": 0.1
+  },
+  "epochs": 130,
+  "selection_record_commit": "6fe5054476ab5880dcd6b329ff4545cb2de80245",
+  "majority_class": {
+    "index": 3,
+    "name": "bowl"
+  },
+  "conditions": {
+    "C1": {
+      "final_state_sha256": {
+        "0": "01c2a26517172d804882af0fe8763fdc9c42a5c65f17e01aa9e12c4d7584cd80",
+        "1": "8c223029ecb59db8a75d796571728561cce7ee87b1eabd6e086787533f2ffa2c",
+        "2": "943ff7af0814fc46783759895f7bb402614e176e596c48c3f728b4ef448124c8"
+      },
+      "stage_manifest_sha256": "0b256c4598533ddb3c5fe22d511baeab09ecdf96821d0da2525e8b5908bcc933"
+    },
+    "C3": {
+      "final_state_sha256": {
+        "0": "21c0432aba991026d8ad31213133d163355462e751dd1e1cc83d7d456a6ae734",
+        "1": "43ed172419627a42716fa03b0b1b24fcfe3d8c12843c700f18349417f3739168",
+        "2": "2a8b9af1ca29563290dc49fa73337f45ac31749c99924e1623282ef5d09ea6d1"
+      },
+      "stage_manifest_sha256": "f0850e69aaee4cea2e9d3786de931e2b516b6cce832e029a8c3c37740070e650"
+    }
+  }
+}
